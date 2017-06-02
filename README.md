@@ -1,11 +1,11 @@
 
-#Abstract
+# Abstract
 This is a proof of concept prototype for a ground service module (subsequently called "GroundServices") for the free flight simulatior FlightGear. Unlike some exisiting ground services
 which are part of various aircraft, it is intended to be generic and not dependant on specific aircrafts (though there will be dependencies from aircraft dimensions).
 It currently only moves ground vehicles along an airports taxiways without providing any services.
 It is written completely in Nasal and is derived/inspired from the existing AI subsystem and tanker.nas (except for the way vehicles are moving).
 
-#Description
+# Description
 After starting FG, GroundServices goes to "standby" mode, monitoring the distance of the main aircraft to the next airport. When the distance is below 3 nm (main.minairportrange), 
 GroundService switches to "active" mode. It reads the corresponding groundnet.xml and stores the groundnet in a graph data structure. For simplification
 the coordinates are projected to a 2D xy coordinate system, where all calculations are executed (The projection currently is a too
@@ -33,15 +33,15 @@ The GUI provides the options to
 of the groundnet lines should be yellow, but differs for some unknown reason (lighting effects?) from red to orange.
 * show the state of each vehicle
 
-#Requirements
+# Requirements
 GroundServices was developed and tested with FlightGear 2016.4.3 and EDDKs an EHAMs groundnet. There are no known special requirements and it should also work with other FlightGear versions 
 and airports that have a groundnet defined. 
 
-#Configuration
+# Configuration
 The main configuration file is AI/groundservices.xml. When no home position is defined for an airport, the first
 parking node will be used as home.
 
-#Installation
+# Installation
 GroundServices is installed by just unpacking the zip file into a FG_ROOT folder. You might backup the folder previously, because there is no real uninstall.
 Choose a "no overwrite" option for avoiding overwriting existing files, though no name conflicts are known currently.
 
@@ -74,10 +74,10 @@ of the airport. Move ufo near there (by PHI; thats very easy) for seeing the veh
 If any problems occur, check FGs logfiles for nasal errors. In addition
 a logfile FG_HOME/nasal.log is written by GroundService and can be checked for errors.
 
-##Uninstall
+## Uninstall
 Uninstallation is done by manually removing the files extracted from the zip file or by restoring FG_ROOT from a backup.
 
-#Current Status
+# Current Status
 GroundServices currently only moves ground vehicles along an airports taxiways without providing any services.
 Its just a prototype and problably contains a lot of bugs. The longer it runs, the risk of
 a null/nil pointer increases. Indicator for this is when all vehicles stop moving. Reloading
