@@ -1,0 +1,300 @@
+<?xml version="1.0"?>
+
+<PropertyList>
+    <name>groundservices</name>
+    <x>-10</x>
+    <layout>vbox</layout>
+
+    <nasal>
+        <open>
+            var dlgRoot = cmdarg();
+
+            var groundserviceslist = props.globals.getNode("/sim/ai/groundservices/", 1).getChildren("vehicle");
+            var select_vehicle_node = nil;
+            
+            if (size(groundserviceslist) > 0) {
+            var combo = gui.findElementByName(dlgRoot, "vehicle-combo");
+            var idx = 0;
+            foreach (var t; groundserviceslist) {
+            combo.getChild("value", idx, 1).setValue(t.getNode("name", 1).getValue());
+            idx += 1;
+            }
+            }
+
+            var select_vehicle = func() {
+            var name = getprop("/sim/gui/dialogs/groundservices/selected-vehicle");
+            logging.debug("selected_vehicle: " ~ name);
+            foreach (var t; groundserviceslist) {
+            if (name == t.getNode("name", 1).getValue()) {
+            select_vehicle_node = t;
+            }
+            }
+            }
+            
+            var generate_groundservice = func() {
+            var sai = -1;
+            if (select_vehicle_node != nil){
+                sai = select_vehicle_node.getIndex();
+            }
+            logging.debug("gui:generate_groundservice "~ sai);
+            if (sai != -1){
+                groundservices.createVehicle(sai);
+            }
+            }
+
+            var generate_move = func(parkpos) {
+            logging.debug("gui:generate_move " ~ parkpos);
+            groundservice.requestMove(1,parkpos);
+            
+            }
+        </open>
+    </nasal>
+
+    <group>
+        <layout>hbox</layout>
+        <empty>
+            <stretch>1</stretch>
+        </empty>
+
+        <text>
+            <label>Ground Services</label>
+        </text>
+
+        <empty>
+            <stretch>1</stretch>
+        </empty>
+
+        <button>
+            <pref-width>16</pref-width>
+            <pref-height>16</pref-height>
+            <legend></legend>
+            <keynum>27</keynum>
+            <border>2</border>
+
+            <binding>
+                <command>dialog-close</command>
+            </binding>
+        </button>
+    </group>
+    <hrule/>
+    <group>
+        <layout>table</layout>
+        
+        <text>
+            <row>0</row>
+            <col>0</col>
+            <halign>right</halign>
+            <label>Vehicle:</label>
+        </text>
+
+        <combo>
+            <name>vehicle-combo</name>
+            <row>0</row>
+            <col>1</col>
+            <colspan>2</colspan>
+            <halign>left</halign>
+            <property>/sim/gui/dialogs/groundservices/selected-vehicle</property>
+            <editable>false</editable>
+            <pref-width>200</pref-width>
+            <halign>fill</halign>
+            <binding>
+                <command>dialog-apply</command>
+                <object-name>vehicle-combo</object-name>
+            </binding>
+            <binding>
+                <command>nasal</command>
+                <script>select_vehicle();</script>
+            </binding>
+        </combo>
+
+        <text>
+            <row>1</row>
+            <col>0</col>
+            <halign>right</halign>
+            <label>Visualize Groundnet:</label>
+        </text>
+
+        <checkbox>
+            <name>visualizegroundnet</name>
+            <row>1</row>
+            <col>1</col>
+            <halign>left</halign>
+            <property>/groundservices/visualizegroundnet</property>
+            <binding>
+                <command>dialog-apply</command>
+                <object-name>visualizegroundnet</object-name>
+            </binding>
+        </checkbox>
+        
+        <!--
+        <text>
+            <row>1</row>
+            <col>0</col>
+            <halign>right</halign>
+            <label>Type:</label>
+        </text>
+
+        <text>
+            <row>1</row>
+            <col>1</col>
+            <visible>
+                <equals>
+                    <property>/sim/gui/dialogs/groundservice/tanker/type</property>
+                    <value>probe</value>
+                </equals>
+            </visible>
+            <colspan>3</colspan>
+            <halign>left</halign>
+            <label>Drogue and Probe</label>
+        </text>
+
+        <text>
+            <row>1</row>
+            <col>1</col>
+            <visible>
+                <equals>
+                    <property>/sim/gui/dialogs/groundservice/tanker/type</property>
+                    <value>boom</value>
+                </equals>
+            </visible>
+            <colspan>3</colspan>
+            <halign>left</halign>
+            <label>Boom</label>
+        </text>
+
+        <text>
+            <row>2</row>
+            <col>0</col>
+            <halign>right</halign>
+            <label>Heading:</label>
+        </text>
+        <input>
+            <row>2</row>
+            <col>1</col>
+            <halign>right</halign>
+            <label></label>
+            <property>/inputgs/heading</property>
+            <binding>
+                <command>dialog-apply</command>
+            </binding>
+        </input>
+        
+        <text>
+            <row>3</row>
+            <col>0</col>
+            <halign>right</halign>
+            <label>Pitch:</label>
+        </text>
+        <input>
+            <row>3</row>
+            <col>1</col>
+            <halign>right</halign>
+            <label></label>
+            <property>/inputgs/pitch</property>
+            <binding>
+                <command>dialog-apply</command>
+            </binding>
+        </input>
+        
+        <text>
+            <row>4</row>
+            <col>0</col>
+            <halign>right</halign>
+            <label>Roll:</label>
+        </text>
+        <input>
+            <row>4</row>
+            <col>1</col>
+            <halign>right</halign>
+            <label></label>
+            <property>/inputgs/roll</property>
+            <binding>
+                <command>dialog-apply</command>
+            </binding>
+        </input>
+        <button>
+            <row>4</row>
+            <col>2</col>
+            <legend>Reload</legend>
+            <equal>true</equal>
+            <binding>
+                <command>nasal</command>
+                <script>groundservice.visualizeGroundnet();</script>
+            </binding>
+        </button>
+        -->
+    </group>
+    <hrule/>
+    <group>
+        <layout>hbox</layout>
+        <default-padding>5</default-padding>
+        <empty>
+            <stretch>true</stretch>
+        </empty>
+        <button>
+            <legend>Launch</legend>
+            <equal>true</equal>
+            <binding>
+                <command>nasal</command>
+                <script>generate_groundservice();</script>
+            </binding>
+        </button>
+       <!-- <empty>
+            <stretch>true</stretch>
+        </empty>
+        <button>
+            <legend>Move to A20</legend>
+            <equal>true</equal>
+            <binding>
+                <command>nasal</command>
+                <script>generate_move("A20");</script>
+            </binding>
+        </button>-->
+        <empty>
+            <stretch>true</stretch>
+        </empty>
+        <button>
+            <legend>Show Status</legend>
+            <equal>true</equal>
+            <binding>
+                <command>nasal</command>
+                <script>groundservices.report()</script>
+            </binding>
+        </button>
+        <empty>
+            <stretch>true</stretch>
+        </empty>
+        <button>
+            <legend>Close</legend>
+            <equal>true</equal>
+            <key>Esc</key>
+            <binding>
+                <command>dialog-close</command>
+            </binding>
+        </button>
+        <empty>
+            <stretch>true</stretch>
+        </empty>
+        <button>
+            <legend>Reload</legend>
+            <equal>true</equal>
+            <binding>
+                <command>nasal</command>
+                <script>var files = ['main.nas','maintest.nas','util.nas','GroundVehicle.nas','Groundnet.nas','Graph.nas',
+                        'mathutil.nas','GroundServiceVisualizer.nas', 'GraphUtils.nas'];
+                    groundservices.shutdown();
+                    foreach (f;files){
+                    io.load_nasal(getprop("/sim/fg-root") ~ "/Nasal/groundservices/"~f,"groundservices");
+                    }
+                    groundservices.reinit();
+                </script>
+            </binding>
+        </button>
+
+        <empty>
+            <stretch>true</stretch>
+        </empty>
+
+    </group>
+
+</PropertyList>

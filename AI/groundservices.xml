@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<PropertyList>
+
+    <!--
+  
+    -->
+
+    <vehicle>
+        <name>Goldhofert</name>
+        <type>pushback</type>
+        <model>Models/GroundServices/Goldhofert/Goldhofert.xml</model>
+        <initialcount>3</initialcount>
+        <movementspeed>4.1</movementspeed>
+    </vehicle>
+
+    <vehicle>
+        <name>FollowMe</name>
+        <type>followme</type>
+        <model>Models/GroundServices/Followme/followme.xml</model>
+        <initialcount>5</initialcount>
+        <movementspeed>7.1</movementspeed>
+    </vehicle>
+
+    <marker>
+        <name>Marker</name>
+        <model>Aircraft/ufo/Models/marker.ac</model>
+    </marker>
+    <marker>
+        <name>Node Marker</name>
+        <model>Models/GroundServices/nodemarker.ac</model>
+    </marker>
+    <marker>
+        <name>Parkpos Marker</name>
+        <model>Models/GroundServices/parkposmarker.ac</model>
+    </marker>
+    <marker>
+        <name>Segment Marker</name>
+        <model>Models/GroundServices/segmentmarker.xml</model>
+    </marker>
+
+    <airports>
+        <EDDK>
+            <home>A20</home>
+            <destination>C_4</destination>
+            <destination>E20</destination>
+            <destination>C_7</destination>
+        </EDDK>
+    </airports>
+
+</PropertyList>
