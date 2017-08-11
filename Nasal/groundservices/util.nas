@@ -5,6 +5,8 @@
 logging.debug("executing util.nas");
 
 var FloatMAX_VALUE = 3.4028234664e+38;
+var knowncallsigns = {};
+var arrivedaircraft = {};
 
 var getXmlAttrStringValue = func(xmlnode,attrname) {
     var attrchild = xmlnode.getChild("___"~attrname);
@@ -87,18 +89,27 @@ var buildTearDropTurn = func(e1, e2, turnloop) {
     return { edge: e1, branch : e2, arc : turnloop};                
 };
 
-var getCurrentAltitude = func() {
-    var pos = geo.aircraft_position();    
+# returns altitude in meter
+# the airport elevation might not fit to scenery (eg. EDDKs 92m is too high)
+# geodinfo might fail when scenery isn't yet loaded. For refreshing altitude, flag needsupdate is used.
+# Renamed getCurrentAltitude->getElevationForLocation
+# 
+var getElevationForLocation = func(pos) {
+    if (pos == nil) {
+        pos = geo.aircraft_position();    
+    }
     var alt = airportelevation; #default 
-    var info = geodinfo(pos.lat(), pos.lon());
+    var needsupdate = 0;
+    var info = geodinfo(pos.lat(), pos.lon());    
     if (info != nil) {
         alt = num(info[0]);
-        logging.debug("altitude="~alt~" "~info[0]);
+        #logging.debug("altitude="~alt~" "~info[0]);
     } else {
-        logging.warn("no current altitide. using airportelevation "~alt);
+        logging.warn("no altitide from geodinfo(" ~ pos.lat() ~ "," ~ pos.lon() ~ "). Using airportelevation "~alt~" m");
+        needsupdate = 1;
     }
     #TODO +5?
-    return alt;
+    return { alt: alt, needsupdate : needsupdate };
 };
 
 #Return random int from 0 to 32767
@@ -166,5 +177,72 @@ var validateObject = func(obj,objname,expectedclassname) {
     return 1; 
 };
 
+var getChildNodeValue = func(node, childname) {
+    var c = node.getChild(childname);
+    if (c == nil) {
+        return "";
+    }
+    return c.getValue();
+};
+
+var getNodeValue = func(node, nodename, defaultvalue = 0) {
+    var c = node.getNode(nodename);
+    if (c == nil) {
+        return defaultvalue;
+    }
+    return c.getValue();
+};
+
+var findAircraftType = func(callsign) {
+    if (size(knowncallsigns) == 0) {
+        var path = getprop("/sim/fg-root") ~ "/Models/GroundServices/callsignmap.txt";
+        var file = io.open(path);
+        var line = io.readln(file);
+        while (line != nil) {
+             var parts = split(" ",line);
+             knowncallsigns[parts[0]] = parts[1];
+             line = io.readln(file);
+        }   
+    }
+    return knowncallsigns[callsign];
+};
+
+var getAiAircraftPosition = func(aN) {
+    var latN = aN.getNode("position/latitude-deg");
+    var lonN = aN.getNode("position/longitude-deg");
+    if (latN == nil or lonN == nil) {
+        return nil;
+    }
+    var lat = latN.getValue();
+    var lon = lonN.getValue();
+    var coord = geo.Coord.new().set_latlon(lat,lon);
+};
+
+#
+# only returns an arrived aircraft once
+var findArrivedAircraft = func(center) {
+    if (center == nil) {
+        return nil;
+    }
+    var aiaircrafts = props.globals.getNode("/ai/models/", 1).getChildren("aircraft");
+    var idx = 0;
+    foreach (var aN; aiaircrafts) {
+        var callsign = getNodeValue(aN,"callsign");
+        var id = getNodeValue(aN,"id");
+        if (arrivedaircraft[id] == nil) {
+            var coord = getAiAircraftPosition(aN);
+            var speed = getNodeValue(aN,"velocities/true-airspeed-kt");        
+            if (coord != nil and speed < 0.1) {
+                var type = findAircraftType(callsign);                                
+                if (coord.distance_to(center) < 5000 and type != nil) {
+                    logging.debug("found non moving AI " ~ callsign ~ " of type " ~ type);
+                    arrivedaircraft[id] = {node : aN, coord : coord, type : type, callsign : callsign};
+                    return arrivedaircraft[id];
+                }
+            }
+        }
+    }
+    return nil;
+};
 
 logging.debug("completed util.nas");

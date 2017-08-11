@@ -64,7 +64,7 @@ var setMarkerAtLocation = func(locationXYZ,markerindex,segment=-1,heading=0) {
         model = props.globals.getNode("/sim/ai/groundservices/marker["~markerindex~"]/model",1).getValue();
     }
     var coord = projection.unproject(locationXYZ);
-    var alt = getCurrentAltitude();
+    var alt = locationXYZ.z;
     #logging.debug("setMarkerAtLocation: "~model~" "~coord.lat()~" "~coord.lon()~", alt="~alt);
     coord.set_alt(alt);# parameter is meter);
     append(groundnetmodel,geo.put_model(model, coord, heading));

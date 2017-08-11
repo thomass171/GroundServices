@@ -103,7 +103,7 @@ var Graph = {
         var pf = PathFinder.new(me, fromnode, me.nodes, graphWeightProvider);
         var result = pf.dijkstra(tonode);
         #pathcache[pathkey]=result;
-        logging.debug("findPath from " ~ fromnode.getName() ~" took " ~ (systime() - starttime) ~ " seconds");
+        logging.debug("findPath from " ~ fromnode.getName() ~ " to " ~ tonode.getName() ~ " took " ~ (systime() - starttime) ~ " seconds");
         return result;                                
     },
     
@@ -183,6 +183,10 @@ var PathFinder = {
             }
             insertIntoList(path, 0, x);            
             x = me.pred[x.id];
+            if (x == nil) {
+                #no predecssor->no path
+                return nil;
+            }
         }
         var p = GraphPath.new(me.startnode, -1);
         var current = me.startnode;

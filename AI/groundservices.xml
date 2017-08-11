@@ -22,6 +22,14 @@
         <movementspeed>7.1</movementspeed>
     </vehicle>
 
+    <vehicle>
+        <name>Volvo Fuel Truck</name>
+        <type>fuel</type>
+        <model>Models/GroundServices/FuelTruck/Fuel_Truck_Short_VolvoFM.xml</model>
+        <initialcount>3</initialcount>
+        <movementspeed>6.1</movementspeed>
+    </vehicle>
+
     <marker>
         <name>Marker</name>
         <model>Aircraft/ufo/Models/marker.ac</model>

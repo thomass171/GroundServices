@@ -10,7 +10,7 @@ var lastlogsecond = 0;
 
 
 var GroundVehicle = {
-	new: func(model, gmc, movementspeed, type) {
+	new: func(model, gmc, movementspeed, type, delay) {
 	    logging.debug("new GroundVehicle. model="~model);
 		#props.globals.getNode("gear/gear[0]/wow", 1).setValue(1);
 		#props.globals.getNode("sim/model/pushback/enabled", 1).setValue(1);
@@ -19,7 +19,8 @@ var GroundVehicle = {
 		m.interval = 10;
 		m.coord = geo.Coord.new();
 		m.gmc = gmc;
-        
+		m.delay = delay;
+
 		var n = props.globals.getNode("models", 1);
 		for (var i = 0; 1; i += 1)
 			if (n.getChild("model", i, 0) == nil)
@@ -67,9 +68,7 @@ var GroundVehicle = {
 		    m.latN.setDoubleValue(coord.lat());
             m.lonN.setDoubleValue(coord.lon());                		               
         }        
-        var alt = getCurrentAltitude();
-       	m.altN.setDoubleValue(alt * M2FT);
-       	                
+                        
         return GroundVehicle.active[m.aiid] = m;
 	},
 	del: func {
@@ -88,24 +87,9 @@ var GroundVehicle = {
 	        #logging.debug("update");
 	    }
 	    
-	    #if (me.gmc == nil) {
-	        #auto rotate
-		    #var radius = me.radiusNode.get
-           # me.position = me.position + (me.speed * deltatime);
-            #var x = math.cos(me.position) * me.radius;
-            #var y = math.sin(me.position) * me.radius;
-            #me.setPositionFromXY({x:x,y:y});
-                 
-		#}
+	    if (currenttime > me.vhc.createtimestamp + me.delay) {
 		    me.moveForward(deltatime);
-		
-        
-        	
-        #me.coord = geo.Coord.new(basepos);
-        #		me.ac = geo.aircraft_position();
-        #		me.distance = me.ac.distance_to(me.coord);
-        #		me.bearing = me.ac.course_to(me.coord);
-        #		settimer(func me.update(), 0);
+		}		       
 	},
 	
 	setPositionFromXY: func(posXY){
@@ -126,13 +110,23 @@ var GroundVehicle = {
         }                          
     },
     
+    # elevation is not unique across an airport and must be updated along with the position.
+    # elevation must be taken directly from some nodes z value instead of from some 3D vector calculation.
     adjustVisual: func(gmc) {         
         var cp = gmc.currentposition;            
         var positionXYZ = cp.get3DPosition();
         #logging.debug("3Dposition="~positionXYZ.toString());
         var coord = me.setPositionFromXY(positionXYZ);
         var heading = get3DRotation(coord,cp.edgeposition,cp.reverseorientation,cp.currentedge.getEffectiveDirection( cp.getAbsolutePosition()));
-        me.hdgN.setValue(heading);            
+        me.hdgN.setValue(heading);
+        # use elevation depending on edge position            
+        var fromalt = cp.currentedge.from.getLocation().z;
+        var toalt = cp.currentedge.to.getLocation().z;
+        var relpos = cp.getAbsolutePosition() / cp.currentedge.getLength();
+        var alt = fromalt + ((toalt-fromalt) * relpos);
+        #logging.debug("updating vehicle altitude to " ~ alt ~ ", fromalt="~fromalt~", toalt="~toalt);
+        me.altN.setDoubleValue(alt * M2FT);
+        
     },
 	
 	report: func {
@@ -298,6 +292,7 @@ var VehicleComponent = {
 	    obj.lastdestination=nil;
 	    obj.path = nil;
 	    obj.aiid = aiid;
+	    obj.createtimestamp = systime();
 		return obj;
 	},
 	

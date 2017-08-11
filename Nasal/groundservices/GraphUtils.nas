@@ -77,12 +77,13 @@ addArcToAngleSimple = func( graph,  start,  e1,  mid,  e2,  end,  radius,  inner
     var e1len = e1.getLength();
     var e2len = e2.getLength();
 
-    if (para.distancefromintersection > e1len + 0.0001) {
+    # more tolerance is required here
+    if (para.distancefromintersection > e1len + 0.1) {
         # not possible to draw arc
         logging.warn("skipping arc because of d=" ~ para.distancefromintersection ~ ", e1len=" ~ e1len);
         return nil;
     }
-    if (para.distancefromintersection > e2len + 0.0001) {
+    if (para.distancefromintersection > e2len + 0.1) {
         # not possible to draw arc
         logging.warn("skipping arc because of d=" ~ para.distancefromintersection ~ ", e2len=" ~ e2len);
         return nil;
@@ -143,6 +144,10 @@ var addTearDropTurn = func( graph,  node,  edge,  left,  smoothingradius,  layer
     var branch = createBranch(graph, vertex, approach, approach.getLength(), angle, layer);
     branch.setName("teardrop.branch");
     var teardrop = addArcToAngleSimple(graph, branch.getOppositeNode(vertex), branch, vertex.getLocation(), approach, node, approach.getLength(), 0, 1, layer);
+    if (teardrop == nil){
+        logging.warn("failed to create teardrop ");
+        return nil;
+    }
     teardrop.setName("teardrop.smootharc");
     return buildTearDropTurn(edge, branch, teardrop);
 };
@@ -198,7 +203,9 @@ var createPathFromGraphPosition = func( graph,  from,  to,  graphWeightProvider,
             # need to turn back to my current edge. Add teardrop for turning at the end of the current edge. 
             logging.debug("creating teardrop turn. firstsegment=" ~ firstsegment.edge.toString() ~ ",from=" ~ from.currentedge.toString());
             var turn = addTearDropTurn(graph, nextnode, from.currentedge, 1, smoothingradius, layer, 0);
-            
+            if (turn == nil) {
+                return nil;
+            }
             smoothedpath.addSegment(GraphPathSegment.new(turn.arc, nextnode));
             smoothedpath.addSegment(GraphPathSegment.new(turn.branch, turn.arc.getOppositeNode(nextnode)));
         }else{
@@ -297,6 +304,9 @@ createTransition = func( graph,  from,  destinationedge,  destinationnode,  smoo
     if (from.currentedge == destinationedge) {
         # need to turn back to my current edge. Add teardrop for turning at the end of the current edge. 
         var turn = addTearDropTurn(graph, nextnode, from.currentedge, 1, smoothingradius, layer, 0);
+        if (turn == nil) {
+            return nil;
+        }
         var gt = GraphTransition.new();
         gt.add(GraphPathSegment.new(turn.arc, nextnode));
         gt.add(GraphPathSegment.new(turn.branch, turn.arc.getOppositeNode(nextnode)));
@@ -320,6 +330,9 @@ createTransition = func( graph,  from,  destinationedge,  destinationnode,  smoo
 
         #TODO not yet completed
         var turn = addTearDropTurn(graph, nextnode, from.currentedge, 1, smoothingradius, layer, 0);
+        if (turn == nil) {
+            return nil;
+        }
         var gt = GraphTransition.new();
         gt.add(GraphPathSegment.new(turn.arc, nextnode));
         gt.add(GraphPathSegment.new(turn.branch, turn.arc.getOppositeNode(nextnode)));

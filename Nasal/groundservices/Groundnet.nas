@@ -61,15 +61,26 @@ var Groundnet = {
                 }
             }
         }
+        var someparkingposwithoneedge = nil;
         if (obj.home == nil) {
             for (var i = 0; i < obj.groundnetgraph.getNodeCount(); i+=1) {
                 var n = obj.groundnetgraph.getNode(i);
                 if (obj.isParking(n)) {
+                    if (n.getEdgeCount() == 1) {
+                        someparkingposwithoneedge = n.customdata;
+                    }                
                     if (n.customdata.getApproach() != nil) {
                         obj.home = n.customdata;
                         break;
                     }
                 }
+            }
+        }
+        if (obj.home == nil) {
+            #No possible home position found. Inconsistent groundnet? Simply pick one of the parking positions with exactly one edge as home
+            logging.warn("no parking position suitable as home found. Using any one");
+            if (someparkingposwithoneedge != nil) {
+                obj.home = someparkingposwithoneedge;
             }
         }
         
@@ -83,8 +94,12 @@ var Groundnet = {
         var latDeg = parseDegree(getXmlAttrStringValue(node,"lat"));
         var lonDeg = parseDegree(getXmlAttrStringValue(node,"lon"));
         #logging.debug("index="~name~latDeg);
-        var xy = projection.project(geo.Coord.new().set_latlon(latDeg,lonDeg));
-        var node = groundnetgraph.addNode(name, Vector3.new(xy.x,xy.y,0));
+        var coord = geo.Coord.new().set_latlon(latDeg,lonDeg);
+        var xy = projection.project(coord);
+        var altinfo = getElevationForLocation(coord);
+        var alt = altinfo.alt;        
+        # Elevation will be stored in z-Coordinate            
+        var node = groundnetgraph.addNode(name, Vector3.new(xy.x,xy.y,alt));
         node.coord = geo.Coord.new().set_latlon(latDeg,lonDeg);
         return node;
 	},
@@ -128,13 +143,22 @@ var Groundnet = {
     },
     
     # Return GraphPosition for parking. Might return null in inconsistent groundnets;
+    # Workaround for inconsistent groundnets if park pos only has one edge.
     getParkingPosition: func(parking) {
         var approach = parking.getApproach();
+        var dirXY = nil;
         if (approach == nil) {
-            return nil;
+            # possible inconsistency
+            #TODO consider layer if (parking.node.getEdgeCount() != 1) {
+            if (parking.node.getEdgeCount() == 0) {            
+                return nil;
+            }
+            approach = parking.node.getEdge(0);
+            dirXY = approach.getEffectiveInboundDirection(parking.node);
+        } else {
+            dirXY = getDirectionFromHeading(parking.heading);
         }
-        var position = nil;
-        var dirXY = getDirectionFromHeading(parking.heading);
+        var position = nil;        
         if (approach.from == parking.node) {
             if (getAngleBetween(Vector3.new(dirXY.x, dirXY.y, 0), approach.getEffectiveOutboundDirection(parking.node)) < PI_2) {
                 position = GraphPosition.new(approach);

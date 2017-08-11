@@ -141,6 +141,7 @@ var maintest = func {
 	miscTest();
     groundnetEDDKTest();
     groundnetOtherTest();
+    logging.debug("maintest completed");
 };
 
 # from props.dump

@@ -26,6 +26,7 @@ The models included are
 
 * the standard Goldhofert pushback truck with aircraftspecific animations removed
 * the followme car from FG Addon 
+* the fuel truck from Gabriels 737-800 branch
 
 The GUI provides the options to
 * launch an additional vehicle (select in combo box and button "Launch")
@@ -34,7 +35,7 @@ of the groundnet lines should be yellow, but differs for some unknown reason (li
 * show the state of each vehicle
 
 # Requirements
-GroundServices was developed and tested with FlightGear 2016.4.3 and EDDKs an EHAMs groundnet. There are no known special requirements and it should also work with other FlightGear versions 
+GroundServices was developed and tested with FlightGear 2016.4.3 and EDDKs, EHAMs and EDDFs groundnet. There are no known special requirements and it should also work with other FlightGear versions 
 and airports that have a groundnet defined. 
 
 # Configuration
@@ -82,6 +83,20 @@ GroundServices currently only moves ground vehicles along an airports taxiways w
 Its just a prototype and problably contains a lot of bugs. The longer it runs, the risk of
 a null/nil pointer increases. Indicator for this is when all vehicles stop moving. Reloading
 the module from the GUI can be used for reiniting GroundService quickly.
+
+# Releases
+# v0.1.0 (20170602)
+Initial release
+# v0.2.0
+Modifications:
+* Fixes the problem of vehicles having wrong elevation when they were launched before
+the scenery was completely loaded.
+* Uses position dependant elevation for visualized ground net segments instead of airport elevation.
+* Fuel truck added
+* Now finds a vehicle home position even for groundnets having inconsistent headings at parking positions
+* Fixes several "non-objects have no members" problems.
+* Delayed launch of initial vehicles
+* preparation for AI traffic integration
 
 
 

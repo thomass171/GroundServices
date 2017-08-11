@@ -24,11 +24,13 @@ var atc_msg = func setprop("sim/messages/atc", call(sprintf, arg));
 
 var basepos =  geo.Coord.new().set_latlon(50.883056,7.116523,400);
 var groundnet = nil;
+# center coord of current airport, otherwise nil
 var center = nil;
 
 var refmarkermodel = nil;
 var projection = nil;
 var lastcheckforstandby = 0;
+var lastcheckforaircraft = 0;
 
 # Nodes
 var visualizegroundnetNode = nil;
@@ -36,7 +38,8 @@ var statusNode = nil;
 # current/next/near airport
 var airportNode = nil;
 
-var maxidletime = 0;
+#increased for avoiding vehicles that are blocked due to missing escape path (eg. missing teardrop turn) to waste CPU time
+var maxidletime = 15;
 var failedairports = {};
 var minairportrange = 3;
 var homename = nil;
@@ -96,13 +99,20 @@ var getAirportInfo = func() {
     #}
     return 1;
 }
-    
+
+var getCurrentAirportIcao = func() {
+    if (airportNode != nil) {
+        return airportNode.getValue();
+    }
+    return "";
+}
+
 #
 # Create an additional ground vehicle based on a given /sim/ai/groundservices/vehicle property node.
 # has index parameter to be callable by dialogs.
 #
-var createVehicle = func(sim_ai_index, graphposition=nil) {
-    logging.debug(modulename~".createVehicle");
+var createVehicle = func(sim_ai_index, graphposition=nil, delay=0) {
+    logging.debug(modulename~".createVehicle with deplay " ~ delay);
     course=0;
     vehicle_node = props.globals.getNode("/sim/ai/groundservices",1).getChild("vehicle", sim_ai_index, 1);
 	var model = vehicle_node.getNode("model", 1).getValue();		
@@ -120,7 +130,7 @@ var createVehicle = func(sim_ai_index, graphposition=nil) {
 	    }
 	}
     gmc = GraphMovingComponent.new(nil,nil,graphposition);	
-	GroundVehicle.new( model, gmc, movementspeed, type);
+	GroundVehicle.new( model, gmc, movementspeed, type,delay);
 }
 
 
@@ -152,18 +162,28 @@ var update = func() {
         }
         return;
     }
-    # is there a better solution for detecting left airport
+    # is there a better solution for detecting left airport?
     if (statusNode.getValue() == "active" and lastcheckforstandby < systime() - 15) {
         lastcheckforstandby = systime();
         var icao = findAirport();
-        if (icao == nil){
+        # airport might suddenly change due to rapid move of aircraft. Intermediate change to standby is required.
+        if (icao == nil or icao != getCurrentAirportIcao()) {
             # airport left
-            logging.info("going to standby");
+            logging.info("going to standby because airport was left");
             shutdown();
             settimer(func update(), 5);
             return;
         }       
     }
+    # check every minute for aircrafts needing service
+    if (statusNode.getValue() == "active" and lastcheckforaircraft < systime() - 60) {
+        lastcheckforaircraft = systime();
+        var aircraft = findArrivedAircraft(center);
+        if (aircraft != nil){
+            logging.info("found arrived aircraft needing service: " ~ aircraft.callsign);            
+        }       
+    }
+
     var deltatime = getprop("sim/time/delta-sec");
     foreach (var v; values(GroundVehicle.active)) {
         var gmc = v.gmc;
@@ -227,6 +247,7 @@ var getNextDestination = func(lastdestination) {
                 }
             }
         }
+        #TODO temprary node
         if (destination != lastdestination) {        
             return destination;
         }
@@ -290,7 +311,7 @@ var wakeup = func() {
         logging.debug("init vehicle " ~ sim_ai_index ~ " with " ~ cnt ~ " instances");
         for (var i=0;i<cnt;i+=1){
             # initial position will be set to defined home pos                 
-            createVehicle(sim_ai_index);
+            createVehicle(sim_ai_index,nil,i*8);
         }
     }
     	    
@@ -318,6 +339,8 @@ var standby = func() {
     }
 }
 
+# check whether change to state active is possible. Requires airport nearby and
+# elevation data available
 var checkWakeup = func() {
     if (statusNode.getValue() != "standby") {
         logging.warn("Ignoring wakeup due to state " ~ statusNode.getValue());
@@ -326,37 +349,41 @@ var checkWakeup = func() {
     if (getAirportInfo()){
         var icao = airportNode.getValue();
         projection = Projection.new(center);   
-          
-        var subpath = chr(icao[0]) ~ "/" ~ chr(icao[1]) ~ "/" ~ chr(icao[2]) ~ "/" ~ icao;
-        var path = getprop("/sim/fg-home") ~ "/TerraSync/Airports/" ~ subpath ~ ".groundnet.xml";        
-        var data = loadGroundnet(path); 
-        if (data == nil) {
-            logging.error("no groundnet for airport " ~ icao ~ ". Added to ignorelist");
-            failedairports[icao] = icao;
-            return;    
-        }
-        var homenode = props.globals.getNode("/sim/ai/groundservices/airports/" ~ icao ~ "/home",0);
-        homename = nil;
-        if (homenode != nil){
-            homename = homenode.getValue(); 
-            logging.info("using home " ~ homename);
-        }
-        
-        groundnet = Groundnet.new(projection, data.getChild("groundnet"), homename);
-        logging.info("groundnet loaded from "~path);
-        
-        # read destination list
-        destinationlist=[];
-        var destinationlistnode = props.globals.getNode("/sim/ai/groundservices/airports/" ~ icao ,0);
-        if (destinationlistnode != nil) {
-            for (var i = 0; 1; i += 1) {
-                var destinationnode = destinationlistnode.getChild("destination", i, 0);
-                if (destinationnode == nil)
-                    break;
-                append(destinationlist,destinationnode.getValue());
+        var altinfo = getElevationForLocation(center);
+                    
+        if (!altinfo.needsupdate) {
+            var subpath = chr(icao[0]) ~ "/" ~ chr(icao[1]) ~ "/" ~ chr(icao[2]) ~ "/" ~ icao;
+            var path = getprop("/sim/fg-home") ~ "/TerraSync/Airports/" ~ subpath ~ ".groundnet.xml";        
+            var data = loadGroundnet(path); 
+            if (data == nil) {
+                logging.error("no groundnet for airport " ~ icao ~ ". Added to ignorelist");
+                failedairports[icao] = icao;
+                return;    
             }
+            var homenode = props.globals.getNode("/sim/ai/groundservices/airports/" ~ icao ~ "/home",0);
+            homename = nil;
+            if (homenode != nil){
+                homename = homenode.getValue(); 
+                logging.info("using home " ~ homename);
+            }
+            
+            groundnet = Groundnet.new(projection, data.getChild("groundnet"), homename);
+            logging.info("groundnet loaded from "~path);
+            
+            # read destination list
+            destinationlist=[];
+            var destinationlistnode = props.globals.getNode("/sim/ai/groundservices/airports/" ~ icao ,0);
+            if (destinationlistnode != nil) {
+                for (var i = 0; 1; i += 1) {
+                    var destinationnode = destinationlistnode.getChild("destination", i, 0);
+                    if (destinationnode == nil)
+                        break;
+                    append(destinationlist,destinationnode.getValue());
+                }
+            }
+            return 1;
         }
-        return 1;
+        logging.debug("ignoring airport. No elevation info");
     }
     return 0;
 }
