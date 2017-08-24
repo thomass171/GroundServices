@@ -222,7 +222,7 @@ var Parking = {
 };
 
 var loadGroundnet = func(path) {
-    logging.debug("Looking for groundnet in "~path);
+    logging.debug("Loading groundnet from "~path);
     var data = call(func io.readxml(path), nil, var err = []);
     if (size(err)){
         logging.error("Reading failed :" ~ path);
@@ -234,4 +234,17 @@ var loadGroundnet = func(path) {
     return data;
 };
 
+# Search FG_SCENERY path for groundnet.xml
+var findGroundnetXml = func(relpath) {
+    foreach (var scenery_node;props.globals.getNode("/sim").getChildren("fg-scenery")) {
+        var scenerypath = scenery_node.getValue();
+        logging.debug("Looking for "~relpath~" in "~scenerypath);
+        var fullpath = scenerypath ~ "/" ~ relpath;
+        if (io.stat(fullpath) != nil) {
+            return fullpath;
+        }
+    }
+    return nil;
+}                   
+            
 logging.debug("completed Groundnet.nas");

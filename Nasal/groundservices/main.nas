@@ -360,7 +360,12 @@ var checkWakeup = func() {
                     
         if (!altinfo.needsupdate) {
             var subpath = chr(icao[0]) ~ "/" ~ chr(icao[1]) ~ "/" ~ chr(icao[2]) ~ "/" ~ icao;
-            var path = getprop("/sim/fg-home") ~ "/TerraSync/Airports/" ~ subpath ~ ".groundnet.xml";        
+            var path = findGroundnetXml("Airports/" ~ subpath ~ ".groundnet.xml");        
+            if (path == nil) {
+                logging.error("no groundnet path for airport " ~ icao ~ ". Added to ignorelist");
+                failedairports[icao] = icao;
+                return;    
+            }
             var data = loadGroundnet(path); 
             if (data == nil) {
                 logging.error("no groundnet for airport " ~ icao ~ ". Added to ignorelist");
