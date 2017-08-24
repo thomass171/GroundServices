@@ -69,7 +69,7 @@ var calcArcParameter = func(   start,  e1,  intersection,  e2,  end,  radius,  i
     var arcbeginloc = start.getLocation().add(v1);
     arcbeginloc = intersection.subtract(v1.multiply(distancefromintersection));
     var arccenter = arcbeginloc.add(radiusvector);
-    return {arccenter:arccenter, radius:radius, distancefromintersection:distancefromintersection, arcbeginloc:arcbeginloc, beta:beta, v2:v2, inner:inner};
+    return {arccenter:arccenter, radius:radius, distancefromintersection:distancefromintersection, arcbeginloc:arcbeginloc, beta:beta, v2:v2, inner:inner, crossproduct:kp};
 };
     
 addArcToAngleSimple = func( graph,  start,  e1,  mid,  e2,  end,  radius,  inner,  radiusisdistance,  layer) {
@@ -117,7 +117,12 @@ addArcToAngle = func( graph, start, e1, mid, e2, end, para, layer) {
     if (para.inner) {
         arc.setArc(para.arccenter, para.radius, -para.beta);
     } else {
-        arc.setArc(para.arccenter, para.radius, -PI2 - para.beta);
+        if (para.crossproduct.getZ() < 0) {
+            # arc needs opposite direction
+            arc.setArc(para.arccenter, para.radius, PI2 - para.beta);
+        } else {
+            arc.setArc(para.arccenter, para.radius, -PI2 - para.beta);
+        }
     }
     return arc;                
 };

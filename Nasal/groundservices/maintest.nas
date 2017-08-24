@@ -82,7 +82,7 @@ var groundnetEDDKTest = func() {
     
     var startposition = buildPositionAtNode(gr.findEdgeByName("133-134"), n134,1);    
     path = createPathFromGraphPosition(gr,startposition , c_7.node, nil, SMOOTHINGRADIUS, 233, 0, MINIMUMPATHSEGMENTLEN);
-    assertEquals("path", "133:e1->turnloop.smootharc(199)->e2(20)->smoothbegin.103(87)->smootharc(2)->smoothbegin.207(21)->smootharc(3)->smoothend.207(48)", path.toString());
+    assertEquals("path to C_7", "133:e1->turnloop.smootharc(131)->e2(20)->smoothbegin.103(87)->smootharc(2)->smoothbegin.207(21)->smootharc(3)->smoothend.207(48)", path.toString());
     assertEquals("statistics","nodes:0:269;233:13;",gr.getStatistic());
     var gmc = GraphMovingComponent.new(nil,nil,startposition);
     gmc.setPath(path);
@@ -98,8 +98,8 @@ var groundnetEDDKTest = func() {
     var a20position = groundnet.getParkingPosition(a20);
     a20position = GraphPosition.new(gr.findEdgeByName("1-201"),50.180775,1);
     assertA20position(a20position);
-    path = groundnet.createPathFromGraphPosition(groundnet.groundnetgraph, a20position, c_4);
-    assertEquals("path", "1:e1->turnloop.smootharc(7)->e2(20)->smoothbegin.63(28)->smootharc(0)->smoothbegin.69(52)->smootharc(12)->smoothbegin.68(14)->smootharc(0)->smoothbegin.129(83)->smootharc(14)->smoothbegin.130(160)->smootharc(0)->smoothbegin.131(27)->smootharc(0)->smoothbegin.132(107)->smootharc(0)->smoothbegin.134(62)->smootharc(0)->smoothbegin.125(81)->smootharc(19)->smoothbegin.206(102)->smootharc(2)->smoothend.206(49)", path.toString());
+    path = groundnet.createPathFromGraphPosition(a20position, c_4);
+    assertEquals("path to C_4", "1:e1->turnloop.smootharc(7)->e2(20)->smoothbegin.63(28)->smootharc(0)->smoothbegin.69(52)->smootharc(12)->smoothbegin.68(14)->smootharc(0)->smoothbegin.129(83)->smootharc(14)->smoothbegin.130(160)->smootharc(0)->smoothbegin.131(27)->smootharc(0)->smoothbegin.132(107)->smootharc(0)->smoothbegin.134(62)->smootharc(0)->smoothbegin.125(81)->smootharc(19)->smoothbegin.206(102)->smootharc(2)->smoothend.206(49)", path.toString());
     assertEquals("statistics","nodes:0:269;1:56;",gr.getStatistic());
     gmc = GraphMovingComponent.new(nil,nil,a20position);
     gmc.setPath(path);
@@ -109,6 +109,18 @@ var groundnetEDDKTest = func() {
     gr.removeLayer(path.layer);
     assertEquals("edges",269,gr.getEdgeCount());
 
+    # Leaving C_4. (issue 2)
+    var c_4position = groundnet.getParkingPosition(groundnet.getParkPos("C_4"));
+    var e20 = groundnet.groundnetgraph.findNodeByName("16");
+    path = groundnet.createPathFromGraphPosition(c_4position, e20);
+    assertEquals("path from C_4", "6:e1->turnloop.smootharc(4)->e2(20)->smoothbegin.104(56)->smootharc(0)->smoothbegin.124(97)->smootharc(18)->smoothbegin.134(67)->smootharc(18)->smoothbegin.89(80)->smootharc(4)->smoothbegin.90(322)->smootharc(20)->smoothbegin.46(78)->smootharc(0)->smoothend.46(21)", path.toString());
+    assertFloat("arccenter distance to 125", 17.89897, getDistanceXYZ(path.getSegment(6).edge.getCenter(), groundnet.groundnetgraph.findNodeByName("125").getLocation()),0.1);
+    gmc = GraphMovingComponent.new(nil, nil, c_4position);
+    gmc.setPath(path);
+    gmc.moveForward(100000);
+    gr.removeLayer(path.layer);
+    assertEquals("edges", 269, gr.getEdgeCount());
+        
     logging.debug("finished groundnetEDDKTest");
              
 };

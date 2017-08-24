@@ -177,10 +177,10 @@ var Groundnet = {
         return position;
     },
         
-    createPathFromGraphPosition: func(graph, from, to) {
+    createPathFromGraphPosition: func(from, to) {
         var layer = me.newLayer();
         var graphWeightProvider = nil;
-        return createPathFromGraphPosition(graph, from, to, graphWeightProvider, SMOOTHINGRADIUS, layer, 0, MINIMUMPATHSEGMENTLEN);
+        return createPathFromGraphPosition(me.groundnetgraph, from, to, graphWeightProvider, SMOOTHINGRADIUS, layer, 0, MINIMUMPATHSEGMENTLEN);
     },
         
     newLayer: func() {

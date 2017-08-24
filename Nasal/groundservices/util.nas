@@ -105,7 +105,10 @@ var getElevationForLocation = func(pos) {
         alt = num(info[0]);
         #logging.debug("altitude="~alt~" "~info[0]);
     } else {
-        logging.warn("no altitide from geodinfo(" ~ pos.lat() ~ "," ~ pos.lon() ~ "). Using airportelevation "~alt~" m");
+        if (!testisrunning) {
+            # tests in general have no scenery and no altitude
+            logging.warn("no altitide from geodinfo(" ~ pos.lat() ~ "," ~ pos.lon() ~ "). Using airportelevation "~alt~" m");
+        }
         needsupdate = 1;
     }
     #TODO +5?

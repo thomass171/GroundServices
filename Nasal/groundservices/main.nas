@@ -44,6 +44,7 @@ var failedairports = {};
 var minairportrange = 3;
 var homename = nil;
 var destinationlist = nil;
+var testisrunning = 0;
 
 
 var report = func {
@@ -213,7 +214,7 @@ var update = func() {
 
 var spawnMoving = func(vehicle, destinationnode) {
     var gmc = vehicle.gmc;
-    var path = groundnet.createPathFromGraphPosition(groundnet.groundnetgraph,gmc.currentposition, destinationnode);
+    var path = groundnet.createPathFromGraphPosition(gmc.currentposition, destinationnode);
     if (path!=nil) {  
         if (visualizer != nil) {
             visualizer.addLayer(groundnet.groundnetgraph,path.layer);
@@ -398,7 +399,9 @@ var reinit = func {
 	shutdown();
 	var path = getprop("/sim/fg-home") ~ '/runtest';
     if (io.stat(path) != nil) {
+        testisrunning = 1;    
 	    maintest();
+	    testisrunning = 0;
 	}
 	#init is done in wakeup through update()
                 
