@@ -64,7 +64,7 @@ var findAirport = func() {
         s ~= sprintf("%s (%s),", apt.name, apt.id);
         if ( foundairport == nil) {
             if (contains(failedairports,apt.id)){
-                logger.warn("Ignoring previously failed airport " ~ apt.id);
+                logging.warn("Ignoring previously failed airport " ~ apt.id);
             } else {
                 foundairport = apt.id;
             }
