@@ -113,7 +113,6 @@
             <halign>right</halign>
             <label>Visualize Groundnet:</label>
         </text>
-
         <checkbox>
             <name>visualizegroundnet</name>
             <row>1</row>
@@ -122,7 +121,23 @@
             <property>/groundservices/visualizegroundnet</property>
             <binding>
                 <command>dialog-apply</command>
-                <object-name>visualizegroundnet</object-name>
+            </binding>
+        </checkbox>
+
+        <text>
+            <row>2</row>
+            <col>0</col>
+            <halign>right</halign>
+            <label>Vehicle automove:</label>
+        </text>
+        <checkbox>
+            <name>automove</name>
+            <row>2</row>
+            <col>1</col>
+            <halign>left</halign>
+            <property>/groundservices/automove</property>
+            <binding>
+                <command>dialog-apply</command>
             </binding>
         </checkbox>
         

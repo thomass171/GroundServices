@@ -10,7 +10,7 @@ var lastlogsecond = 0;
 
 
 var GroundVehicle = {
-	new: func(model, gmc, movementspeed, type, delay) {
+	new: func(model, gmc, maximumspeed, type, delay) {
 	    logging.debug("new GroundVehicle. model="~model);
 		#props.globals.getNode("gear/gear[0]/wow", 1).setValue(1);
 		#props.globals.getNode("sim/model/pushback/enabled", 1).setValue(1);
@@ -46,8 +46,8 @@ var GroundVehicle = {
 		m.lonN = m.ai.getNode("position/longitude-deg", 1);
 		m.altN = m.ai.getNode("position/altitude-ft", 1);
 		m.hdgN = m.ai.getNode("orientation/true-heading-deg", 1);
-		m.movementspeedN = m.ai.getNode("movementspeed", 1);		
-        m.movementspeedN.setValue(movementspeed);
+		m.maximumspeedN = m.ai.getNode("maximumspeed", 1);		
+        m.maximumspeedN.setValue(maximumspeed);
         
 		#m.update();
 		
@@ -104,7 +104,7 @@ var GroundVehicle = {
         var gmc = me.gmc;
        
         if (gmc.automove) {
-            var speed = me.movementspeedN.getValue();
+            var speed = me.maximumspeedN.getValue();
             gmc.moveForward(deltatime * speed);
             me.adjustVisual(gmc);  
         }                          

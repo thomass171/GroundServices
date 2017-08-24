@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- 12.7.17. Model by Adrià Gomez Andreu from https://scenery.flightgear.org/app.php?c=Models&a=view&id=6620-->
+<PropertyList>
+
+    <path>catruckmed-lsg.ac</path>
+    
+    <offsets>
+        <pitch-deg>0</pitch-deg>
+        <heading-deg>90</heading-deg>
+        <roll-deg>0</roll-deg>
+        <x-m>0</x-m>
+        <y-m>0</y-m>
+        <z-m>0</z-m>
+    </offsets>
+
+</PropertyList>

@@ -37,6 +37,8 @@ var visualizegroundnetNode = nil;
 var statusNode = nil;
 # current/next/near airport
 var airportNode = nil;
+var automoveNode = nil;
+var simaigroundservicesN = nil;
 
 #increased for avoiding vehicles that are blocked due to missing escape path (eg. missing teardrop turn) to waste CPU time
 var maxidletime = 15;
@@ -118,7 +120,7 @@ var createVehicle = func(sim_ai_index, graphposition=nil, delay=0) {
     vehicle_node = props.globals.getNode("/sim/ai/groundservices",1).getChild("vehicle", sim_ai_index, 1);
 	var model = vehicle_node.getNode("model", 1).getValue();		
 	var type  = vehicle_node.getNode("type", 1).getValue();
-	var movementspeed = vehicle_node.getNode("movementspeed",1).getValue() or 5;
+	var maximumspeed = vehicle_node.getNode("maximumspeed",1).getValue() or 5;
 		
 	var gmc = nil;
     if (graphposition == nil){
@@ -131,7 +133,7 @@ var createVehicle = func(sim_ai_index, graphposition=nil, delay=0) {
 	    }
 	}
     gmc = GraphMovingComponent.new(nil,nil,graphposition);	
-	GroundVehicle.new( model, gmc, movementspeed, type,delay);
+	GroundVehicle.new( model, gmc, maximumspeed, type,delay);
 }
 
 
@@ -201,12 +203,14 @@ var update = func() {
             groundnet.groundnetgraph.removeLayer(p.layer);
             vhc.setStateIdle();
         }        
-                    
-        #spawn moving for idle vehicles to random destination
-        if (vhc.expiredIdle(maxidletime)) {             
-            vhc.lastdestination = getNextDestination(vhc.lastdestination);
-            logging.debug("Spawning move to " ~ vhc.lastdestination.getName());                
-            spawnMoving(v, vhc.lastdestination);
+
+        if (automoveNode.getValue()) {                    
+            #spawn moving for idle vehicles to random destination
+            if (vhc.expiredIdle(maxidletime)) {             
+                vhc.lastdestination = getNextDestination(vhc.lastdestination);
+                logging.debug("Spawning move to " ~ vhc.lastdestination.getName());                
+                spawnMoving(v, vhc.lastdestination);
+            }
         }
     }
     settimer(func update(), 0);
@@ -289,24 +293,26 @@ var initNode = func(subpath, value, type) {
 
 # TODO see core lib setlistener doc
 var initProperties = func() {
+    simaigroundservicesN = props.globals.getNode("/sim/ai/groundservices",1);
+
     var PROPGROUNDSERVICES = "/groundservices";
     var PROPVISUALIZEGROUNDNET = "visualizegroundnet";
     var PROPVISUALIZEPARKING = "visualizeparking";
-    visualizegroundnetNode = props.globals.getNode(PROPGROUNDSERVICES~"/"~PROPVISUALIZEGROUNDNET,1);
+    #visualizegroundnetNode = props.globals.getNode(PROPGROUNDSERVICES~"/"~PROPVISUALIZEGROUNDNET,1);
     statusNode = initNode("status", "standby", "STRING");
     airportNode = initNode("airport", "", "STRING");
+    visualizegroundnetNode = initNode("visualizegroundnet", 0, "INT");
     setlistener(visualizegroundnetNode,visualizeGroundnet);
     props.globals.getNode(PROPGROUNDSERVICES~"/"~PROPVISUALIZEPARKING,1);
-    props.globals.getNode("/inputgs/heading",1).setValue(7.139103);
-    props.globals.getNode("/inputgs/pitch",1).setValue(50.86538-90);
-    props.globals.getNode("/inputgs/roll",1).setValue(90);
+    automoveNode = initNode("automove", getNodeValue(simaigroundservicesN,"config/automove",1), "INT");
+        
 }
 
 #
 # wakeup from state standby. airport and groundnet info is already set.
 var wakeup = func() {
     logging.debug("wakeup: loading initial settings");
-    foreach (var vehicle_node;props.globals.getNode("/sim/ai/groundservices",1).getChildren("vehicle")){
+    foreach (var vehicle_node;simaigroundservicesN.getChildren("vehicle")){
         var sim_ai_index = vehicle_node.getIndex();
         var cnt=vehicle_node.getValue("initialcount") or 0;
         logging.debug("init vehicle " ~ sim_ai_index ~ " with " ~ cnt ~ " instances");
@@ -370,6 +376,7 @@ var checkWakeup = func() {
             
             groundnet = Groundnet.new(projection, data.getChild("groundnet"), homename);
             logging.info("groundnet loaded from "~path);
+            logging.info("groundnet graph has "~groundnet.groundnetgraph.getEdgeCount()~" edges");
             
             # read destination list
             destinationlist=[];

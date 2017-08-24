@@ -3,15 +3,19 @@
 <PropertyList>
 
     <!--
-  
+        properties go to /sim/ai/groundservices
     -->
-
+    <config>
+        <!--should vehicles start moving around on their own without being requested-->
+        <automove>1</automove>
+    </config>
     <vehicle>
         <name>Goldhofert</name>
         <type>pushback</type>
         <model>Models/GroundServices/Goldhofert/Goldhofert.xml</model>
         <initialcount>3</initialcount>
-        <movementspeed>4.1</movementspeed>
+        <maximumspeed>4.1</maximumspeed>
+        <acceleration>1.1</acceleration>
     </vehicle>
 
     <vehicle>
@@ -19,7 +23,8 @@
         <type>followme</type>
         <model>Models/GroundServices/Followme/followme.xml</model>
         <initialcount>5</initialcount>
-        <movementspeed>7.1</movementspeed>
+        <maximumspeed>7.1</maximumspeed>
+        <acceleration>4.5</acceleration>
     </vehicle>
 
     <vehicle>
@@ -27,7 +32,17 @@
         <type>fuel</type>
         <model>Models/GroundServices/FuelTruck/Fuel_Truck_Short_VolvoFM.xml</model>
         <initialcount>3</initialcount>
-        <movementspeed>6.1</movementspeed>
+        <maximumspeed>6.1</maximumspeed>
+        <acceleration>1.3</acceleration>
+    </vehicle>
+
+    <vehicle>
+        <name>Catering Truck</name>
+        <type>catering</type>
+        <model>Models/GroundServices/Catering/catruckmed-lsg1.xml</model>
+        <initialcount>4</initialcount>
+        <maximumspeed>6.1</maximumspeed>
+        <acceleration>1.5</acceleration>
     </vehicle>
 
     <marker>
