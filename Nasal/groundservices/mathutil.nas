@@ -137,7 +137,7 @@ var getDirectionFromHeading = func(degree) {
     var rad = -radianFromDegree(degree);
     var x = -math.sin(rad);
     var y = math.cos(rad);
-    return {x:x,y:y};
+    return Vector2.new(x,y);
 };
 
 # including deflection(?) compensation
@@ -146,6 +146,10 @@ var getTrueHeadingFromDirection = func(coord,vXY) {
     var direction = geo.Coord.new().set_latlon(coord.lat()+1*vXY.y,coord.lon()+1*vXY.x);    
     var heading = coord.course_to(direction);
     return heading;   
+};
+
+var getDegreeFromHeading = func(heading) {
+    return (-(90 + heading));
 };
 
 
@@ -163,7 +167,7 @@ var getLineIntersection = func( p1,  p2,  p3,  p4) {
     }
     var xs = (((p4.x - p3.x) * ((p2.x * p1.y) - (p1.x * p2.y))) - ((p2.x - p1.x) * ((p4.x * p3.y) - (p3.x * p4.y)))) / nenner;
     var ys = (((p1.y - p2.y) * (p4.x * p3.y - p3.x * p4.y)) - ((p3.y - p4.y) * (p2.x * p1.y - p1.x * p2.y))) / nenner;
-    return buildXY(xs, ys);
+    return Vector2.new(xs, ys);
 };
 
 var isEqual = func (f1,f2,epsilon=FLT_EPSILON) {
@@ -172,6 +176,63 @@ var isEqual = func (f1,f2,epsilon=FLT_EPSILON) {
 	    return 0;
 	}	
 	return 1;
+};
+
+var Vector2 = {
+    new: func(x=0,y=0) {	    
+	    var obj = { parents: [Vector2] };
+		obj.x = x;
+		obj.y = y;
+		return obj;
+	},
+	
+	getX: func() {return me.x;},
+	getY: func() {return me.y;},
+	
+	add: func(v) {
+        return Vector2.new(me.x + v.x, me.y + v.y);
+    },
+        
+    subtract: func(v) {
+        return Vector2.new(me.x - v.x, me.y - v.y);
+    },
+        
+    multiply: func(scale) {
+        return Vector2.new(me.x * scale, me.y * scale);
+    },
+    
+	#rotate by degree
+    rotate: func(degree) {
+        #logging.debug("rotate: degree="~degree);
+    
+        var rad = radianFromDegree(degree);
+        var rotXY = rotateXY(me.x,me.y,rad);   
+        return Vector2.new(rotXY.x,rotXY.y);
+    },
+  
+    negate: func() {
+        return Vector2.new( -me.x, -me.y);
+    },   
+};
+    
+var buildFromVector2 = func (vXY) {
+    return Vector3.new(vXY.getX(), vXY.getY(), 0);
+};
+
+var isPointOnLine = func(startXY, endXY, pXY) {
+    if (pXY.getX() < math.min(startXY.getX(), endXY.getX())) {
+        return 0;
+    }
+    if (pXY.getX() > math.max(startXY.getX(), endXY.getX())) {
+        return 0;
+    }
+    if (pXY.getY() < math.min(startXY.getY(), endXY.getY())) {
+        return 0;
+    }
+    if (pXY.getY() > math.max(startXY.getY(), endXY.getY())) {
+        return 0;
+    }
+    return 1;
 };
 
 logging.debug("completed mathutil.nas");

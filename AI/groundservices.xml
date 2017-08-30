@@ -70,5 +70,23 @@
             <destination>C_7</destination>
         </EDDK>
     </airports>
-
+    <!-- aircraft special coordinates. Might need to be merged with AI door positions some time-->
+    <aircraft>
+        <type>747-400</type>
+        <wingspread>64.4</wingspread>
+        <wingpassingpoint>
+            <x>-3</x>
+            <y>40</y>
+        </wingpassingpoint>
+        <leftwingapproachpoint>
+            <x>13</x>
+            <y>-16</y>
+        </leftwingapproachpoint>
+        <!--first door is expected to be front left-->
+        <door>
+            <x>-20.38</x>
+            <y>-2.89</y>
+            <z>-0.24</z>
+        </door>
+    </aircraft>
 </PropertyList>

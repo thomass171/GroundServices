@@ -121,10 +121,6 @@ var randnextInt = func() {
     logging.debug("random int="~r);
     return r;
 };
-	
-var buildXY = func(x,y) {
-	return { x :x,y:y};
-};
 
 var Projection = {
     METERPERDEGREE : 1850 * 60,
@@ -139,7 +135,7 @@ var Projection = {
 	    var x = (coorCoord.lon() - me.origin.lon()) * Projection.METERPERDEGREE;
 	    var y = (coorCoord.lat() - me.origin.lat()) * Projection.METERPERDEGREE;
 	    #logging.debug("project: lat=" ~ coorCoord.lat() ~ ",lon=" ~ coorCoord.lon() ~ ",origin.lat=" ~ me.origin.lat() ~ ",origin.lon=" ~ me.origin.lon() ~ " to "~x~","~y);     	   
-	    return buildXY(x,y);
+	    return Vector2.new(x,y);
     },
         
     unproject: func (locXY) {
@@ -180,12 +176,16 @@ var validateObject = func(obj,objname,expectedclassname) {
     return 1; 
 };
 
-var getChildNodeValue = func(node, childname) {
+var getChildNodeValue = func(node, childname, defaultvalue = 0) {
     var c = node.getChild(childname);
     if (c == nil) {
         return "";
     }
-    return c.getValue();
+    var value = c.getValue();
+    if (value == nil) {
+        return defaultvalue;
+    }
+    return value;
 };
 
 var getNodeValue = func(node, nodename, defaultvalue = 0) {
@@ -247,5 +247,14 @@ var findArrivedAircraft = func(center) {
     }
     return nil;
 };
+
+# check for empty string
+var empty = func(s) {
+    if (s == nil)
+        return 1;
+    if (size(s)==0)
+        return 1;
+    return 0;
+}
 
 logging.debug("completed util.nas");

@@ -6,7 +6,7 @@ logging.debug("executing GroundVehicle.nas");
 
 var baseid = 5567;
 var lastlogsecond = 0;
-
+var graphmovementdebuglog = 1;
 
 
 var GroundVehicle = {
@@ -155,6 +155,7 @@ var GraphMovingComponent = {
 		obj.automove = 0;
 		obj.path = nil;
 		obj.selector = nil;
+		obj.statechangetimestamp = 0;
 		return obj;
 	},
 	
@@ -163,6 +164,11 @@ var GraphMovingComponent = {
         me.path = path;
         me.automove = 1;
         me.selector = GraphPathSelector.new(path);
+        if (path.startposition != nil) {
+            me.currentposition = path.startposition;
+            me.currentposition.reversegear = path.backward;
+        }
+        me.statechangetimestamp = systime();
     },
     	        	
     moveForward: func( amount) {
@@ -170,21 +176,15 @@ var GraphMovingComponent = {
         if (amount > 0) {
             me.currentposition.edgeposition += amount;
             while (me.currentposition.edgeposition > me.currentposition.currentedge.len) {
-                var outbound = (me.currentposition.reverseorientation) ? me.currentposition.currentedge.from : me.currentposition.currentedge.to;
-                var newedge = me.selector.findNextEdgeAtNode(me.currentposition.currentedge, outbound);
-                if (newedge == nil) {
+                var switchnode = (me.currentposition.reverseorientation) ? me.currentposition.currentedge.from : me.currentposition.currentedge.to;
+                var newsegment = me.selector.findNextEdgeAtNode(me.currentposition.currentedge, switchnode);
+                if (newsegment == nil) {
                     me.currentposition.edgeposition = me.currentposition.currentedge.len;
                     if (me.path != nil) {
                         me.movepathCompleted();
                     }
                 } else {
-                    if (outbound == newedge.from) {
-                        me.currentposition.reverseorientation = 0;
-                    } else {
-                        me.currentposition.reverseorientation = 1;
-                    }
-                    me.currentposition.edgeposition -= me.currentposition.currentedge.getLength();
-                    me.currentposition.currentedge = newedge;
+                    me.adjustPositionOnNewEdge(switchnode, newsegment, me.currentposition.edgeposition - me.currentposition.currentedge.len);
                 }
             }
         }
@@ -192,47 +192,66 @@ var GraphMovingComponent = {
         if (amount < 0) {
             me.currentposition.edgeposition += amount;
             while (me.currentposition.edgeposition < 0) {
-                var inbound = (me.currentposition.reverseorientation) ? me.currentposition.currentedge.to : me.currentposition.currentedge.from;
-                var newedge = me.selector.findNextEdgeAtNode(me.currentposition.currentedge, inbound);
-                if (newedge == nil) {
+                var switchnode = (me.currentposition.reverseorientation) ? me.currentposition.currentedge.to : me.currentposition.currentedge.from;
+                var newsegment = me.selector.findNextEdgeAtNode(me.currentposition.currentedge, switchnode);
+                if (newsegment == nil) {
                     me.currentposition.edgeposition = 0;
                     if (me.path != nil) {
                         me.movepathCompleted();
                     }
                 } else {
-                    if (inbound == newedge.to) {
-                        me.currentposition.reverseorientation = 0;
-                    } else {
-                        me.currentposition.reverseorientation = 1;
-                    }
-                    me.currentposition.edgeposition = newedge.len + me.currentposition.edgeposition;
-                    me.currentposition.currentedge = newedge;
+                    me.adjustPositionOnNewEdge(switchnode, newsegment, math.abs(me.currentposition.edgeposition));
                 }
             }
         }
     },
 
-    movepathCompleted: func() {
-        logging.info("move path completed at " ~ me.currentposition.toString());
-        # find corresponding position in layer 0 if a path was used.
-        var nextnode = me.currentposition.getNodeInDirectionOfOrientation();
-        var dir = me.currentposition.currentedge.getEffectiveInboundDirection(nextnode);
-        var newpos = nil;
-        foreach (var e ; nextnode.edges) {
-            #be quite tolerant
-            if (e.getLayer() == 0 and getAngleBetween(e.getEffectiveInboundDirection(nextnode), dir) < 0.01) {
-                newpos = buildPositionAtNode(e, nextnode, 0);
-                logging.debug("switching to new current position in layer 0:" ~ newpos.toString());
-                break;
+    adjustPositionOnNewEdge: func(switchnode, newsegment, remaining) {
+        var newedge = newsegment.edge;
+        if ((switchnode == newedge.to and switchnode == me.currentposition.currentedge.from) or
+                (switchnode == newedge.from and switchnode == me.currentposition.currentedge.to)) {
+            me.currentposition.reverseorientation = me.currentposition.reverseorientation;
+        } else {
+            me.currentposition.reverseorientation = !me.currentposition.reverseorientation;
+        }
+        if (newsegment.changeorientation) {
+            me.currentposition.reverseorientation = !me.currentposition.reverseorientation;
+        }
+
+        if (newedge.to == switchnode) {
+            # entering through to
+            if (me.currentposition.reverseorientation) {
+                me.currentposition.edgeposition = remaining;
+            } else {
+                me.currentposition.edgeposition = newedge.len - remaining;
+            }
+        } else {
+            # entering through from
+            if (me.currentposition.reverseorientation) {
+                #OK
+                me.currentposition.edgeposition = newedge.len - remaining;
+            } else {
+                me.currentposition.edgeposition = remaining;
             }
         }
-        if (newpos == nil) {
-            logging.error("No corresponding position in layer 0");
-        } else {
-            me.currentposition = newpos;
+        me.currentposition.currentedge = newedge;
+        me.currentposition.reversegear = 0;
+    },
+    
+    movepathCompleted: func() {
+        if (graphmovementdebuglog) {   
+            logging.info("move path completed at " ~ me.currentposition.toString());
         }
-        me.path=nil;
-        me.automove=0;        
+        
+        if (me.path.finalposition != nil) {
+            #logging.debug("switching to new current position :" ~ me.path.finalposition);
+            me.currentposition = me.path.finalposition;
+        }
+        var pathforreturn = me.path;
+        me.path = nil;
+        me.automove = 0;
+        me.statechangetimestamp = systime();
+        return pathforreturn;        
     },    	    
         	
     pathCompleted: func() {
@@ -269,9 +288,9 @@ var GraphPathSelector = {
         }
 
         if (index < me.path.getSegmentCount() - 1) {
-            var edge = me.path.getSegment(index + 1).edge;        
+            var segment = me.path.getSegment(index + 1);        
             #logging.debug("findNextEdgeAtNode:" ~ ((edge!=nil)?edge.toString():"nil"));        
-            return edge;
+            return segment;
         }
         return nil;
     },

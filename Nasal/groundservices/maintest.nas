@@ -51,14 +51,18 @@ var assertA20position = func(a20position) {
     assertTrue("a20position.reverse", a20position.isReverse());     
 };
 
+var loadGroundNetForTest = func(icao) {
+    var projection = Projection.new(geo.Coord.new().set_latlon(50.86538,7.139103));   
+    var data = loadGroundnet(getprop("/sim/fg-root") ~ "/Nasal/groundservices/test/"~icao~"-refgroundnet.xml");
+    var groundnet = Groundnet.new(projection, data.getChild("groundnet"), "A20");
+    return groundnet;
+};
+
 #
 # large epsilon due to rounding effects
 var groundnetEDDKTest = func() {
     logging.debug("running groundnetEDDKTest");
-    var projection = Projection.new(geo.Coord.new().set_latlon(50.86538,7.139103));   
-    var data = loadGroundnet(getprop("/sim/fg-root") ~ "/Nasal/groundservices/test/EDDK-refgroundnet.xml");
-
-    var groundnet = Groundnet.new(projection, data.getChild("groundnet"), "A20");
+    var groundnet = loadGroundNetForTest("EDDK");
     assertVector3("node0",Vector3.new(-1889.7698,-295.14346,0),groundnet.groundnetgraph.getNode(0).getLocation(),0.5);            
     assertEquals("nodes",241,groundnet.groundnetgraph.getNodeCount());
     if (assertEquals("edges",269,groundnet.groundnetgraph.getEdgeCount())) {
@@ -81,7 +85,7 @@ var groundnetEDDKTest = func() {
     assertEquals("path", "134:133-134->103-133(88)->207-103(24)->7-207(50)", path.toString());
     
     var startposition = buildPositionAtNode(gr.findEdgeByName("133-134"), n134,1);    
-    path = createPathFromGraphPosition(gr,startposition , c_7.node, nil, SMOOTHINGRADIUS, 233, 0, MINIMUMPATHSEGMENTLEN);
+    path = createPathFromGraphPosition(gr,startposition , c_7.node, nil, SMOOTHINGRADIUS, 233, 1, MINIMUMPATHSEGMENTLEN);
     assertEquals("path to C_7", "133:e1->turnloop.smootharc(131)->e2(20)->smoothbegin.103(87)->smootharc(2)->smoothbegin.207(21)->smootharc(3)->smoothend.207(48)", path.toString());
     assertEquals("statistics","nodes:0:269;233:13;",gr.getStatistic());
     var gmc = GraphMovingComponent.new(nil,nil,startposition);
@@ -147,12 +151,45 @@ var miscTest = func() {
     logging.debug("finished miscTest");
 };
 
+var testServicePoint747_B2 = func() {
+    logging.debug("running testServicePoint747_B2");
+    var groundnet = loadGroundNetForTest("EDDK");
+        
+    var b_2 = groundnet.getParkPos("B_2");
+    var sp = ServicePoint.new(groundnet, nil, b_2.node.getLocation(), b_2.heading, getAircraftConfiguration("747-400"));
+    assertVector3("wolrddorrpos",Vector3.new(-1698.4425,1320.0948,0),sp.worlddoorpos,0.1);
+    assertEquals("wingreturnlayer",4,sp.wingreturn.getLayer());
+    
+    var wingapproachlen = sp.wingapproach.getLength();
+    assertFloat("wingapproachlen", 30, wingapproachlen);
+    # fuel truck approach. 
+    var start = GraphPosition.new(groundnet.groundnetgraph.findEdgeByName("129-130"));
+    # first without smoothing.
+    var path = sp.getApproach(start, sp.wingedge.to, 0);
+    assertEquals("path", "130:e1->turnloop.smootharc(69)->e2(20)->100-130(88)->202-100(27)->branchedge(18)->wingapproach(30)->wingedge(20)", path.toString());
+    # back path
+    path = sp.getWingReturnPath(0);
+    assertEquals("path", "outernode:return0->return1(20)->return12(19)->bypass(45)->65-64(53)->64-68(39)->68-69(21)->63-69(59)->1-63(28)", path.toString());
+    # now with smoothing
+    path = sp.getWingReturnPath(1);
+    assertEquals("path", "outernode:smoothbegin.->smootharc(12)->smoothbegin.ex(8)->smootharc(10)->smoothbegin.3(1)->smootharc(18)->smoothbegin.65(33)->smootharc(0)->smoothbegin.64(49)->smootharc(9)->smoothbegin.68(10)->smootharc(24)->smoothend.68(0)->smoothbegin.63(59)->smootharc(0)->smoothend.63(28)", path.toString());
+
+    # now from A20. Catering must not move beneath aircraft
+    start = GraphPosition.new(groundnet.groundnetgraph.findEdgeByName("1-201"));
+    path = sp.getApproach(start, sp.doorEdge.from, 0);
+    assertEquals("path", "201:e1->turnloop.smootharc(9)->e2(20)->201-63(23)->63-69(59)->68-69(21)->129-68(91)->129-130(169)->130-131(27)->101-131(100)->branchedge(16)->wingedge(16)->door2wing(27)->(16)", path.toString());
+    path = sp.getApproach(start, sp.wingedge.to, 0);
+            
+    logging.debug("finished testServicePoint747_B2");
+};
+    
 var maintest = func {
 	logging.debug("running maintest");
 	
 	miscTest();
     groundnetEDDKTest();
     groundnetOtherTest();
+    testServicePoint747_B2();
     logging.debug("maintest completed");
 };
 

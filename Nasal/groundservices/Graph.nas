@@ -107,6 +107,19 @@ var Graph = {
         return result;                                
     },
     
+    findNearestNode: func(pXYZ, graphNodeFilter) {
+        var best = nil;
+        var bestdistance = FloatMAX_VALUE;
+        foreach (var n ; me.nodes) {
+            var distance = getDistanceXYZ(pXYZ, n.getLocation());
+            if (distance < bestdistance and (graphNodeFilter == nil or graphNodeFilter.acceptNode(n))) {
+                bestdistance = distance;
+                best = n;
+            }
+        }
+        return best;
+    },
+        
     removeLayer: func(layer) {
         var nlist = [];
         foreach (var e ; me.edges) {
@@ -321,8 +334,6 @@ var GraphEdge = {
         }
         var degree = (me.angle < 0) ? -90 : 90;
         var dir = rotateXY(me.vf.x,me.vf.y, radianFromDegree(degree));
-        #    arcdir = vf.rotate(new Quaternion(new Degree(0), new Degree(0), new Degree(degree));
-        #    arcdir = arcdir.rotate(new Quaternion(new Degree(0), new Degree(0), Degree.buildFromRadians(angle * edgeposition / len)));
         var rotangle = me.angle * edgeposition / me.len;
         #logging.debug("getEffectiveDirection: rotangle="~rotangle~",len="~me.len);
         dir = rotateXY(dir.x,dir.y,rotangle);
@@ -396,6 +407,10 @@ var GraphEdge = {
 	    #return me.name ~ " from " ~ me.from.toString() ~ " to " ~ me.to.toString() ~ ", len=" ~ me.len; 
 	    return me.getName() ~ "(" ~ me.from.getName() ~ "->" ~ me.to.getName() ~ ")";
 	},
+	
+	getAngleBetweenEdges: func(i, node, o) {
+        return getAngleBetween(i.getEffectiveInboundDirection(node), o.getEffectiveOutboundDirection(node));
+    },
 };
 
 
@@ -503,6 +518,9 @@ var GraphPath = {
 	    obj.layer = layer;
 	    # list of GraphPathSegment
 	    obj.path = [];
+	    obj.startposition = nil;
+	    obj.backward = 0;
+	    obj.finalposition = nil;
 	    return obj;
 	},
         
@@ -546,7 +564,11 @@ var GraphPath = {
     },
     
     toString: func() {
-        var s = "" ~ me.start.getName() ~ ":";
+        var s = "";
+        if (me.startposition != nil and me.backward) {
+            s = s ~ "[back on "+me.startposition.currentedge.getName()+"]";
+        }                 
+        s = s ~ me.start.getName() ~ ":";
         if (size(me.path) == 0) {
             return s;
         }
@@ -575,6 +597,7 @@ var GraphPathSegment = {
 	    var obj = { parents: [GraphPathSegment] };
 	    obj.edge = edge;
 	    obj.enternode = enternode;
+	    obj.changeorientation = 0;
 	    return obj;
     },
 
@@ -605,19 +628,67 @@ var DefaultGraphWeightProvider = {
     new: func( graph, validlayer) {	    
 	    var obj = { parents: [DefaultGraphWeightProvider] };
 	    obj.graph = graph;
-	    obj.validlayer = validlayer;
+	    # me.validlayer is int array, parameter is int
+	    obj.validlayer = [validlayer];
+	    obj.voidedges = [];
 	    return obj;
     },
     
     getWeight: func(n1, n2) {                
+        if (me.voidedges != nil) {
+            foreach (var e; me.voidedges) {
+                if (e.from == n1 and e.to == n2) {
+                    return FloatMAX_VALUE;
+                }
+                if (e.to == n1 and e.from == n2) {
+                    return FloatMAX_VALUE;
+                }
+            }
+        }
         var e1 = me.graph.findConnection(n1, n2);
-        if (me.validlayer != -1 and e1.getLayer() != me.validlayer) {
+        if (!me.isvalid(e1.getLayer())) {
             return FloatMAX_VALUE;
         }
         return me.graph.getWeight(n1, n2);
     },
+    
+    isvalid: func( layer) {
+        if (me.validlayer == nil) {
+            return 1;
+        }
+        foreach (var l; me.validlayer) {
+            if (l == layer) {
+                return 1;
+            }
+        }
+        return 0;
+    }
 };
 
+#Graph extension for Teardrop, turnloop, back, etc.
+var TurnExtension = {    
+    new: func(edge, branch, arc) {	    
+	    var obj = { parents: [TurnExtension] };
+	    obj.edge = edge;
+	    obj.branch = branch;
+	    obj.arc = arc;
+	    return obj;
+    },
+
+    # Same for branch and arc (but not edge).
+    getLayer: func() {
+        if (me.branch!=nil) {
+            return me.branch.getLayer();
+        }
+        if (me.edge!=nil) {
+            return me.edge.getLayer();
+        }
+        if (me.arc!=nil) {
+            return me.arc.getLayer();
+        }
+        return -1;
+    },
+};
 
 var buildPositionAtNode = func( edge,  node,  intoedge) {
     if (edge.from == node) {
@@ -634,4 +705,6 @@ var buildPositionAtNode = func( edge,  node,  intoedge) {
     }
 };
 
+
+    
 logging.debug("completed Graph.nas");
