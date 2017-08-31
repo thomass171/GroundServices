@@ -1,0 +1,251 @@
+<?xml version="1.0"?>
+<!-- derived from gui/dialogs/airports.xml -->
+<PropertyList>
+  <name>groundservicesmap</name>
+  <layout>vbox</layout>
+  <resizable>true</resizable>
+  <default-padding>3</default-padding>
+
+  <group>
+    <layout>hbox</layout>
+    <default-padding>1</default-padding>
+    <empty><stretch>1</stretch></empty>
+    <text>
+      <label>Ground Services</label>
+    </text>
+    <empty><stretch>1</stretch></empty>
+    <button>
+      <pref-width>16</pref-width>
+      <pref-height>16</pref-height>
+      <legend></legend>
+      <keynum>27</keynum>
+      <border>2</border>
+      <binding>
+        <command>dialog-close</command>
+      </binding>
+      <binding>
+        <command>property-toggle</command>
+        <property>/sim/gui/dialogs/airports/signals/dialog-close</property>
+      </binding>
+    </button>
+  </group>
+
+  <hrule/>
+
+  <nasal>
+    <!-- Generalize all this, turn into helpers and load defaults via XML -->
+    <open><![CDATA[
+      var MAX_RUNWAYS = 28; # number of entries at KEDW
+
+      var DIALOG = cmdarg();
+
+      ## "prologue" currently required by the canvas-generic-map
+       var dialog_name ="airports"; #TODO: use substr() and cmdarg() to get this dynamically
+       var dialog_property = func(p) return "/sim/gui/dialogs/airports/"~p; #TODO: generalize using cmdarg
+       var DIALOG_CANVAS = gui.findElementByName(DIALOG, "airport-selection");
+       canvas.GenericMap.setupGUI(DIALOG_CANVAS, "canvas-control"); #TODO: this is not a method!
+      ## end of canvas-generic-map prologue
+
+      setprop("/sim/gui/dialogs/airports/selected-airport/rwy", "");
+      setprop("/sim/gui/dialogs/airports/selected-airport/parkpos", "");
+      setprop("/sim/gui/dialogs/airports/list", "");
+
+      if (getprop("/sim/gui/dialogs/airports/display-taxiways") == "") {
+        setprop("/sim/gui/dialogs/airports/display-taxiways", "1");
+      }
+
+      if (getprop("/sim/gui/dialogs/airports/display-parking") == "") {
+        setprop("/sim/gui/dialogs/airports/display-parking", "0");
+      }
+
+      if (getprop("/sim/gui/dialogs/airports/display-tower") == "") {
+        setprop("/sim/gui/dialogs/airports/display-tower", "1");
+      }
+
+      # Start with the closest airport
+      var airport_id = airportinfo().id;
+  
+      var dlg = props.globals.getNode("/sim/gui/dialogs/airports", 1);
+      var avail_runways = dlg.getNode("available-runways", 1);
+      var avail_parking = {};
+
+      if (dlg.getNode("list") == nil)
+          dlg.getNode("list", 1).setValue("");
+      
+      var update_info = func {
+          var info = airportinfo(airport_id);
+          setprop("/sim/gui/dialogs/airports/selected-airport/id", airport_id);
+          setprop("/sim/gui/dialogs/airports/selected-airport/name", info.name);
+          setprop("/sim/gui/dialogs/airports/selected-airport/location", sprintf("%.3f / %.3f", info.lat, info.lon));
+          setprop("/sim/gui/dialogs/airports/selected-airport/lon", info.lon);
+          setprop("/sim/gui/dialogs/airports/selected-airport/elevation-ft", 3.28 * info.elevation);
+          setprop("/sim/gui/dialogs/airports/selected-airport/rwy", "");
+          setprop("/sim/gui/dialogs/airports/selected-airport/parkpos", "");
+                
+          var runways = info.runways;
+
+          avail_runways.removeChildren("value");
+          var runway_keys = sort(keys(runways), string.icmp);
+          var i = 0;
+
+          foreach(var rwy; runway_keys) {
+              var r = runways[rwy];
+              avail_runways.getNode("value[" ~ i ~ "]", 1).setValue(rwy);
+
+              setprop("sim/gui/dialogs/airports/selected-airport/runway[" ~ i ~ "]/label", rwy);
+              setprop("sim/gui/dialogs/airports/selected-airport/runway[" ~ i ~ "]/length-hdg",
+                  sprintf("%d'/%03d deg", r.length * 3.28, r.heading));
+
+              if (r.ils != nil) {
+                  setprop("sim/gui/dialogs/airports/selected-airport/runway[" ~ i ~ "]/ils", sprintf("%.3fMhz", r.ils.frequency / 100));
+              } else {
+                  setprop("sim/gui/dialogs/airports/selected-airport/runway[" ~ i ~ "]/ils", "");
+              }
+
+              i += 1;
+              if (i == MAX_RUNWAYS)
+                  break;
+          }
+
+          while (i < MAX_RUNWAYS) {
+          # zero remaining runway data
+              setprop("sim/gui/dialogs/airports/selected-airport/runway[" ~ i ~ "]/label", "");
+              setprop("sim/gui/dialogs/airports/selected-airport/runway[" ~ i ~ "]/length-hdg", "");
+              setprop("sim/gui/dialogs/airports/selected-airport/runway[" ~ i ~ "]/ils", "");
+              i += 1;
+          }
+
+          # Update the list of available parking positions
+          avail_parking = {};
+          foreach (var park; info.parking()) {
+              avail_parking[park.name] = 1;
+          }
+          
+          var airport_pos = geo.Coord.new();
+          airport_pos.set_latlon(info.lat, info.lon);
+
+          var pos = geo.aircraft_position();
+          #var dst = pos.distance_to(airport_pos) / 1852.0;
+          #var crs = pos.course_to(airport_pos);
+          #setprop("/sim/gui/dialogs/airports/selected-airport/distance-nm", dst);
+          #setprop("/sim/gui/dialogs/airports/selected-airport/course-deg", crs);
+
+          #gui.dialog_update("airports", "runway-list");
+      }
+
+    
+      canvas.register_callback(update_info); # FIXME: this is a workaround to run dialog-specific code in the canvas block
+      ]]>
+    </open>
+    
+  </nasal>
+    <group>
+      <layout>vbox</layout>
+      <halign>fill</halign>
+      <valign>top</valign>
+      <default-padding>0</default-padding>
+         
+          <group>
+            <layout>vbox</layout>
+              
+            <!-- Instantiate a generic canvas map and parametrize it via inclusion -->
+            <!-- TODO: use params and aliasing -->
+            <canvas include="/Nasal/canvas/generic-canvas-map.xml">
+
+              <name>airport-selection</name>
+              <valign>fill</valign>
+              <halign>fill</halign>
+              <stretch>true</stretch>
+              <pref-width>400</pref-width>
+              <pref-height>400</pref-height>
+
+              <features>
+                <!-- TODO: use params and aliases to make this shorter -->
+                <!-- TODO: support styling, i.e. image sets/fonts and colors to be used -->
+                <!-- this will set up individual "layers" and map them to boolean "toggle" properties -->
+                <!-- providing an optional "description" tag here allows us to create all checkboxes procedurally -->
+                <dialog-root>/sim/gui/dialogs/airports</dialog-root>
+                <range-property>zoom</range-property>
+
+                <!-- These are the ranges available for the map:       var ranges = [0.1, 0.25, 0.5, 1, 2.5, 5] -->
+
+                <ranges>
+                  <range>0.1</range>
+                  <range>0.25</range>
+                  <range>0.5</range>
+                  <range>1</range>
+                  <range>2.5</range>
+                  <range>5</range>
+                </ranges>
+
+                <!-- available layers and their toggle property (appended to dialog-root specified above) -->
+
+                <layer>
+                  <name>runways</name>					<!-- the name of the layer -->
+                  <init-property>selected-airport/id</init-property>	<!-- the init/input property that re-inits the layer MODEL -->
+                  <property>display-runways</property>			<!-- the property switch that toggles the layer on/off (show/hide) -->
+                  <description>Show Runways</description> 		<!-- the checkbox label for the property -->
+                  <default>enabled</default>				<!-- default state -->
+                  <hide-checkbox>true</hide-checkbox>  			<!-- if the checkbox should be shown or hidden -->
+                </layer>
+                <layer>
+                  <name>taxiways</name>
+                  <init-property>selected-airport/id</init-property>
+                  <property>display-taxiways</property>
+                  <description>Show Taxiways</description>
+                  <default>enabled</default>
+                </layer>
+
+                <layer>
+                  <name>parkings</name>
+                  <init-property>selected-airport/id</init-property>
+                  <property>display-parking</property>
+                  <description>Show Parking</description>
+                  <default>disabled</default>
+                </layer>
+
+                <layer>
+                  <name>towers</name>
+                  <init-property>selected-airport/id</init-property>
+                  <property>display-tower</property>
+                  <description>Show Tower</description>
+                  <default>enabled</default>
+                </layer>
+                <!-- Uncomment this to add a navaid layer (not yet fully implemented, and no LOD yet)
+                <layer>
+                              <name>navaids</name>
+                  <init-property>selected-airport/id</init-property>
+                              <property>display-navaids</property>
+                  <description>Display Navaids within current range</description>
+                  <default>disabled</default>
+                      </layer>
+                -->
+
+             </features>
+            </canvas>
+
+            <group>
+                <name>canvas-control</name> <!-- this is the handle we use to procedurally add all "toggle layer" checkboxes  and the zoom control-->
+                <layout>hbox</layout>
+            </group>
+          </group>
+    </group>
+    
+    <hrule/>
+
+    <group>
+      <layout>hbox</layout>
+      <default-padding>5</default-padding>
+      <empty><stretch>true</stretch></empty>
+      <button>
+        <legend>Close</legend>
+        <equal>true</equal>
+        <key>Esc</key>
+        <binding>
+          <command>dialog-close</command>
+        </binding>
+      </button>
+
+      <empty><stretch>true</stretch></empty>
+    </group>
+  </PropertyList>
