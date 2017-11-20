@@ -1,9 +1,9 @@
 #!/bin/sh
 #
-# Eigentlich nur einmalig erforderlich. Aber vielleicht ergibt sich ja vielleicht nochmal was neues.
+# Build a list of helper models for marking taxiways. Only needed once.
+# A more dynamic solution is preferrable, but not yet known.
 # 
 #
-SOURCEDIR=$HOME/Projekte/GroundServices
 
 checkrc() {
 	if [ $1 != 0 ]
@@ -13,16 +13,21 @@ checkrc() {
 	fi
 }
 
+if [ ! -r README.md ]
+then
+    error "not in base directory"
+fi
+
 buildMarker() {
-for i in 0 1 2 3 4 5 6 7 8 9
-do
-for j in 0 1 2 3 4 5 6 7 8 9
-do
-for k in 0 1 2 3 4 5 6 7 8 9
-do
-    typeset -i meter
-    meter=$i*100+$j*10+k
-    echo "AC3Db
+    for i in 0 1 2 3 4 5 6 7 8 9
+    do
+        for j in 0 1 2 3 4 5 6 7 8 9
+        do
+            for k in 0 1 2 3 4 5 6 7 8 9
+            do
+            typeset -i meter
+            meter=$i*100+$j*10+k
+            echo "AC3Db
 MATERIAL \"yellow\" rgb 1 1 0 amb 1 0 0 emis 1 0 0 spec 0 0 0 shi 0 trans 0.1
 OBJECT world
 kids 1
@@ -37,13 +42,11 @@ mat 0
 refs 2
 0 0 0
 1 0 0
-kids 0" > $SOURCEDIR/Models/GroundServices/markerpool/segment$meter.ac
-done
-done
-done
+kids 0" > GroundServices/markerpool/segment$meter.ac
+            done
+        done
+    done
 }
-
-cd $SOURCEDIR
 
 buildMarker
 
