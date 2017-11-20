@@ -17,6 +17,10 @@ var Groundnet = {
 		obj.parkposname2node = {};
 		obj.home = nil;
 		obj.layerid = 0;
+		#save projection locally to be available in tests
+		obj.projection = projection;
+		obj.minaltitude = 10000;
+        obj.maxaltitude = -10000;
 		#logging.debug("groundnetNode "~groundnetNode.getName());
 		
         var nodelist = groundnetNode.getChild("TaxiNodes",0).getChildren("node");
@@ -24,13 +28,14 @@ var Groundnet = {
             var node = nodelist[i];
             #logging.debug("node "~i~node.getName());
             var n = obj.addNode(obj.groundnetgraph, projection, node);
-            
+            obj.registerAltitude(n);
         }
         nodelist = groundnetNode.getChild("parkingList",0).getChildren("Parking");
         for (i = 0; i < size(nodelist); i=i+1) {
             var node = nodelist[i];
             #logging.debug("node "~i~node.getName());
             var n = obj.addNode(obj.groundnetgraph, projection, node);
+            obj.registerAltitude(n);
             var parkingname = getXmlAttrStringValue(node, "name");
             #n.customdata = { type:"P", name: parkingname, node : n};
             n.customdata = Parking.new(n, parkingname, getXmlFloatAttribute(node, "heading", 0), getXmlFloatAttribute(node, "pushBackRoute", -1), getXmlFloatAttribute(node, "radius", 0));
@@ -47,10 +52,10 @@ var Groundnet = {
             var bn = obj.groundnetgraph.findNodeByName(begin);
             var en = obj.groundnetgraph.findNodeByName(end);
             if (bn == nil) {
-                logger.warn("begin node not found: " ~ begin);
+                logging.warn("begin node not found: " ~ begin);
             } else {
                 if (en == nil) {
-                    logger.warn("end node not found: " ~ end);
+                    logging.warn("end node not found: " ~ end);
                 } else {
                     var c = obj.groundnetgraph.findConnection(bn, en);
                     if (c == nil) {
@@ -90,6 +95,16 @@ var Groundnet = {
 		return obj;
 	},
 	
+	registerAltitude: func(n) {
+	    var alt = n.locationXYZ.z;
+	    if (alt < me.minaltitude) {
+	        me.minaltitude = alt;
+	    }
+	    if (alt > me.maxaltitude) {
+            me.maxaltitude = alt;
+        }
+	},
+	
     addNode: func(groundnetgraph, projection, node) {
 	    var name = getXmlAttrStringValue(node,"index");
         var latDeg = parseDegree(getXmlAttrStringValue(node,"lat"));
@@ -104,7 +119,28 @@ var Groundnet = {
         node.coord = geo.Coord.new().set_latlon(latDeg,lonDeg);
         return node;
 	},
-		        	
+
+    # z will be overwritten with corresponding altitude
+    addNodeToGraph: func(name, locXYZ) { 
+        var coord = me.projection.unproject(locXYZ);    
+        var altinfo = getElevationForLocation(coord);
+        var alt = altinfo.alt;        
+        # Elevation will be stored in z-Coordinate  
+        locXYZ.z = alt;
+        var node = me.groundnetgraph.addNode(name, locXYZ);
+        node.coord = coord;
+        return node;
+    },
+    
+    buildVector3FromVector2WithAltitude: func(xy) {
+        var coord = me.projection.unproject(xy);    
+        var altinfo = getElevationForLocation(coord);
+        var alt = altinfo.alt;        
+        # Elevation will be stored in z-Coordinate  
+        logging.debug("using alt "~alt~" for new node");          
+        return Vector3.new(xy.x,xy.y,alt);        
+    },
+    
     # get park pos by logical groundnet name. Returns Parking customdata
     getParkPos: func(name) {
         var n = me.parkposname2node[name];
@@ -124,6 +160,26 @@ var Groundnet = {
         return nil;
     },
 
+    # get park pos closest to coordinates. Returns Parking customdata
+    getParkPosNearCoordinates: func(coord) {
+        var shortestdistance = FloatMAX_VALUE;
+        var best = nil;
+        for (i = 0; i < me.groundnetgraph.getNodeCount(); i=i+1) {
+            n = me.groundnetgraph.getNode(i);
+            if (me.isParking(n)) {
+                var distance = n.coord.distance_to(coord);            
+                if (distance < shortestdistance) {
+                    shortestdistance = distance;
+                    best = n;
+                }
+            }
+        }
+        if (best == nil) {
+            logging.warn("no best found");
+        }
+        return best.customdata;
+    },
+    
     isParking: func(n){    
         var customdata = n['customdata'];
         if (customdata == nil){
@@ -222,6 +278,11 @@ var Groundnet = {
         return createPathFromGraphPosition(me.groundnetgraph, from, to, graphWeightProvider, SMOOTHINGRADIUS, layer, withsmooth, MINIMUMPATHSEGMENTLEN);
     },
         
+    createBackPathFromGraphPosition: func(startnode, startedge, backturn, to, graphWeightProvider, withsmooth) {
+        var layer = me.newLayer();
+        return createBackPathFromGraphPosition(me.groundnetgraph, startnode, startedge, backturn, to, graphWeightProvider, SMOOTHINGRADIUS, layer, withsmooth, MINIMUMPATHSEGMENTLEN);
+    },
+            
     newLayer: func() {
         me.layerid+=1;
         #logging.debug("new layer is "~layerid);
@@ -231,25 +292,26 @@ var Groundnet = {
     # Create approach to aircraft door.
     #
     # layerid is created internally and the same for all created segements.
-    # Returns [edge at door],[returnsuccessor].
-    createDoorApproach: func( worlddoorposXY, aircraftdirectionXY, worldwingpassingpointXY, worldrearpointXY, wingspread) {
+    # Returns [edge at door,returnsuccessor?,branchedge].
+    createDoorApproach: func( prjdoorposXYZ, aircraftdirectionXY, prjwingpassingpointXYZ, prjrearpointXYZ, wingspread,approachoffset) {
         var layer = me.newLayer();
         #heading away from aircraft
         var approachdirectionXY = aircraftdirectionXY.rotate(-90);
         var approachlen = MINIMUMPATHSEGMENTLEN + 0.001;
         approachlen = wingspread / 4;
-        var doorposXYZ = buildFromVector2(worlddoorposXY);
-        var door0 = me.groundnetgraph.addNode("door0", doorposXYZ);
-        var door1 = me.groundnetgraph.addNode("door1", doorposXYZ.add(buildFromVector2(approachdirectionXY).normalize().multiply(approachlen)));
+        # Avoid vehicle to move into aircraft by moving destination node more outside.
+        prjdoorposXYZ = prjdoorposXYZ.add(buildFromVector2(approachdirectionXY.normalize().multiply(approachoffset)));                
+        var door0 = me.addNodeToGraph("door0", prjdoorposXYZ);
+        var door1 = me.addNodeToGraph("door1", prjdoorposXYZ.add(buildFromVector2(approachdirectionXY.normalize().multiply(approachlen))));
 
-        var dooredge = me.groundnetgraph.connectNodes(door0, door1, "",layer);
+        var dooredge = me.groundnetgraph.connectNodes(door0, door1, "dooredge",layer);
 
-        var wing0 = me.groundnetgraph.addNode("wing0", buildFromVector2(worldwingpassingpointXY));
+        var wing0 = me.addNodeToGraph("wing0", prjwingpassingpointXYZ);
         var door2wing = me.groundnetgraph.connectNodes(door1, wing0, "door2wing", layer);
 
         # direction at wing edge
         var wingdirectionXY = approachdirectionXY.rotate(-90);
-        var wing1 = me.groundnetgraph.addNode("wing1", wing0.getLocation().add(buildFromVector2(wingdirectionXY).normalize().multiply(approachlen)));
+        var wing1 = me.addNodeToGraph("wing1", wing0.getLocation().add(buildFromVector2(wingdirectionXY.normalize().multiply(approachlen))));
         var c1 = me.groundnetgraph.connectNodes(wing0, wing1, "wingedge", layer);
 
         #default branch/merge node is first node if no specific node can be found.
@@ -258,54 +320,67 @@ var Groundnet = {
         var best = nil;
         if (o != nil) {
             best =  o[0];
-            var distanceoffrom = getDistanceXYZ(best.from.getLocation(), buildFromVector2(worldrearpointXY));
-            var distanceofto = getDistanceXYZ(best.to.getLocation(), buildFromVector2(worldrearpointXY));
+            var distanceoffrom = getDistanceXYZ(best.from.getLocation(), (prjrearpointXYZ));
+            var distanceofto = getDistanceXYZ(best.to.getLocation(), (prjrearpointXYZ));
             if (distanceoffrom < distanceofto) {
                 branchnode = best.from;
             } else {
                 branchnode = best.to;
             }
         }
-        var c2 = me.groundnetgraph.connectNodes(wing1, branchnode, "branchedge", layer);
-        return [dooredge, door2wing];
+        var branchedge = me.groundnetgraph.connectNodes(wing1, branchnode, "branchedge", layer);
+        return [dooredge, door2wing, branchedge];
     },
 
     # Create approach to aircraft wing for refueling.
     #
     # layerid is created internally and the same for all created segements.
-    # Returns [edge at wing],[returnsuccessor].
-    createFuelingApproach: func(aircraftpositionXYZ, aircraftdirectionXY, worldleftwingapproachpointXY, worldrearpointXY) {
+    # Returns [edge at wing],[returnsuccessor,wingbestHitEdge].
+    createFuelingApproach: func(aircraftpositionXYZ, aircraftdirectionXY, prjleftwingapproachpointXYZ, prjrearpointXYZ) {
         var layer = me.newLayer();
         #heading appx parallel to wing of aircraft
         var approachdirectionXY = aircraftdirectionXY.rotate(110);
         var approachlen = MINIMUMPATHSEGMENTLEN + 0.001;
-        var innerposXYZ = buildFromVector2(worldleftwingapproachpointXY);
-        var innernode = me.groundnetgraph.addNode("innernode", innerposXYZ);
-        var outernode = me.groundnetgraph.addNode("outernode", innerposXYZ.add(buildFromVector2(approachdirectionXY).normalize().multiply(approachlen)));
+        var innerposXYZ = prjleftwingapproachpointXYZ;
+        var innernode = me.addNodeToGraph("innernode", innerposXYZ);
+        var outernode = me.addNodeToGraph("outernode", innerposXYZ.add(buildFromVector2(approachdirectionXY.normalize().multiply(approachlen))));
         var wingedge = me.groundnetgraph.connectNodes(innernode, outernode, "wingedge", layer);
 
-        var approachbegin = me.groundnetgraph.addNode("enternode", innerposXYZ.subtract(buildFromVector2(aircraftdirectionXY).normalize().multiply(30)));
+        var approachbegin = me.addNodeToGraph("enternode", innerposXYZ.subtract(buildFromVector2(aircraftdirectionXY.normalize().multiply(30))));
         var approach = me.groundnetgraph.connectNodes(approachbegin, innernode, "wingapproach", layer);
 
         #default merge/branch node is first node if no specific node can be found.
         var branchnode = me.groundnetgraph.getNode(0);
         var o = me.findHitEdge(approachbegin.getLocation(), getHeadingFromDirection(aircraftdirectionXY.negate()));
-        var best = nil;
+        var bestHitEdge = nil;
         if (o != nil) {
-            best = o[0];
-            var distanceoffrom = getDistanceXYZ(best.from.getLocation(), buildFromVector2(worldrearpointXY));
-            var distanceofto = getDistanceXYZ(best.to.getLocation(), buildFromVector2(worldrearpointXY));
+            bestHitEdge = o[0];
+            var distanceoffrom = getDistanceXYZ(bestHitEdge.from.getLocation(), (prjrearpointXYZ));
+            var distanceofto = getDistanceXYZ(bestHitEdge.to.getLocation(), (prjrearpointXYZ));
             if (distanceoffrom < distanceofto) {
-                branchnode = best.from;
+                branchnode = bestHitEdge.from;
             } else {
-                branchnode = best.to;
+                branchnode = bestHitEdge.to;
             }
         }
 
         var branchedge = me.groundnetgraph.connectNodes(branchnode, approachbegin, "branchedge", layer);
-        return [wingedge, approach, branchedge];
+        return [wingedge, approach, branchedge,bestHitEdge];
     },
  
+    # Returns XYZ projected coordinates for aircraft local coordinates.
+    # a possible z offset (eg. door height) in the local coordinates is lost here. This is intended here,
+    # because the resulting location is used as vehicle destination. And the vehicle moves on the ground. 
+    getProjectedAircraftLocation: func( aircraftpositionXYZ,  heading,  aircraftlocalXYZ) {
+        var aircraftlocalXY = Vector2.new(aircraftlocalXYZ.x,aircraftlocalXYZ.y);
+        #var direction = getDirectionFromHeading(heading);
+        var degree = getDegreeFromHeading(heading);
+        aircraftlocalXY = aircraftlocalXY.rotate(degree);
+     
+        var prjpos = aircraftpositionXYZ.add(buildFromVector2(aircraftlocalXY));
+        return me.buildVector3FromVector2WithAltitude(prjpos);
+    },
+     
     # name is "create" instead of "find" because a temporary arc is added.
     createBack: func( startnode,  dooredge,  successor) {
         var layer = me.newLayer();
@@ -318,12 +393,13 @@ var Groundnet = {
         var return0 = extendWithEdge(me.groundnetgraph, wingedge, SMOOTHINGRADIUS + 0.001, layer);
         logging.debug("return0.layer="~return0.getLayer()~" "~layer);
         return0.setName("return0");
+        # third parameter is a direction, not a location. So z should be 0.
         var return1 = extend(me.groundnetgraph, return0.to, buildFromVector2(aircraftdirectionXY.negate()), MINIMUMPATHSEGMENTLEN, layer);
         return1.setName("return1");
         var nearest = me.groundnetgraph.findNearestNode(return1.to.getLocation(), NodeToLayer0Filter());
 
         var return2 = me.groundnetgraph.connectNodes(return1.to, nearest, "return12", layer);
-        return return0;
+        return [return0, return1, return2];
     },
 };
 
@@ -385,16 +461,7 @@ var findGroundnetXml = func(relpath) {
     return nil;
 };                  
      
-# Returns XY world coordinates for aircraft local coordinates.
-var getAircraftWorldLocation = func( aircraftpositionXYZ,  heading,  aircraftlocalXYZ) {
-    var aircraftlocalXY = Vector2.new(aircraftlocalXYZ.x,aircraftlocalXYZ.y);
-    #var direction = getDirectionFromHeading(heading);
-    var degree = getDegreeFromHeading(heading);
-    aircraftlocalXY = aircraftlocalXY.rotate(degree);
 
-    var worlddoorpos = aircraftpositionXYZ.add(buildFromVector2(aircraftlocalXY));
-    return Vector2.new(worlddoorpos.getX(), worlddoorpos.getY());
-};
 
 # a GraphNodeFilter
 var NodeToLayer0Filter = func() {

@@ -147,6 +147,17 @@ var Graph = {
         }
         return s;
     },
+    
+    dumpToLog: func() {
+        var index=0;
+        foreach (var e ; me.edges) {
+        }
+        index=0;
+        foreach (var n ; me.nodes) {
+            logging.debug("node "~index~": "~n.name~"("~n.locationXYZ.toString());
+            index +=1;
+        }
+    },
 };
 
 #Dijkstra's algorithm to find shortest path from s to all other nodes
@@ -293,7 +304,7 @@ var GraphEdge = {
             
     checklen: func() {
         if (me.len < 0.000001){
-            logging.warn("adjusting too low len to 0.000001");
+            logging.warn(me.name~": adjusting too low len to 0.000001");
             me.len = 0.000001;
             return 1;
         }
@@ -411,6 +422,10 @@ var GraphEdge = {
 	getAngleBetweenEdges: func(i, node, o) {
         return getAngleBetween(i.getEffectiveInboundDirection(node), o.getEffectiveOutboundDirection(node));
     },
+    
+    isArc: func() {
+        return me.center != nil;
+    },
 };
 
 
@@ -474,6 +489,7 @@ var GraphPosition = {
 		obj.currentedge = edge;
 		obj.edgeposition = edgeposition;
 		obj.reverseorientation = reverseorientation;
+		obj.reversegear = 0;
 		if (edge == nil) {
 		    logging.warn("edge is nil");
 		}
@@ -588,7 +604,30 @@ var GraphPath = {
         }
     },
     
+    getLength: func(currentposition) {
+        var len = 0;
+        for (var i = me.getSegmentCount() - 1; i>=0;i=i-1) {
+            var e = me.getSegment(i).edge;
+            if (currentposition!=nil and e == currentposition.currentedge) {
+                len += currentposition.currentedge.getLength()-currentposition.edgeposition;
+                return len;
+            }
+            len += e.getLength();
+        }
+        return len;
+    },
     
+    validateAltitude: func() {
+        for (var i = 0; i<me.getSegmentCount() ; i=i+1) {
+            var e = me.getSegment(i).edge;
+            if (validateAltitude(e.from.locationXYZ.z)) {
+                logging.warn("out of range altitude in edge.from "~e.from.toString());
+            }
+            if (validateAltitude(e.to.locationXYZ.z)) {
+                logging.warn("out of range altitude in edge.to "~e.to.toString());
+            }
+        }
+    },
 };
 
 

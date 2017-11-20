@@ -6,6 +6,7 @@ logging.debug("executing util.nas");
 
 var FloatMAX_VALUE = 3.4028234664e+38;
 var knowncallsigns = {};
+# key in arrivedaircraft is the AI id
 var arrivedaircraft = {};
 
 var getXmlAttrStringValue = func(xmlnode,attrname) {
@@ -95,6 +96,11 @@ var buildTearDropTurn = func(e1, e2, turnloop) {
 # Renamed getCurrentAltitude->getElevationForLocation
 # 
 var getElevationForLocation = func(pos) {
+    if (unittesting) {
+        # non zero altitude for detecting rotation issues
+        # tests in general have no scenery and no altitude                
+        return { alt: virtualtestingaltitude, needsupdate : 0 };
+    }
     if (pos == nil) {
         pos = geo.aircraft_position();    
     }
@@ -105,10 +111,7 @@ var getElevationForLocation = func(pos) {
         alt = num(info[0]);
         #logging.debug("altitude="~alt~" "~info[0]);
     } else {
-        if (!testisrunning) {
-            # tests in general have no scenery and no altitude
-            logging.warn("no altitide from geodinfo(" ~ pos.lat() ~ "," ~ pos.lon() ~ "). Using airportelevation "~alt~" m");
-        }
+        logging.warn("no altitide from geodinfo(" ~ pos.lat() ~ "," ~ pos.lon() ~ "). Using airportelevation "~alt~" m");
         needsupdate = 1;
     }
     #TODO +5?
@@ -221,32 +224,71 @@ var getAiAircraftPosition = func(aN) {
     var coord = geo.Coord.new().set_latlon(lat,lon);
 };
 
-#
-# only returns an arrived aircraft once
-var findArrivedAircraft = func(center) {
-    if (center == nil) {
-        return nil;
+var getAiAircraftHeading = func(aN) {
+    var course = aN.getNode("orientation/heading-deg");
+    if (course == nil) {
+        course = aN.getNode("orientation/true-heading-deg");
+        if (course == nil) {
+            logging.warn("no orientation/[true-]heading-deg for AI aircraft");
+            return 0;
+        }        
     }
+    return course.getValue();
+}
+
+#Returns Coord
+var getAircraftPosition = func() {
+    return geo.aircraft_position();
+}
+
+var getAircraftHeading = func() {
+    var course = getprop("/orientation/heading-deg");
+    return course;
+}
+
+
+#
+# check all AI aircrafts that are nearby and which are not moving
+#
+var collectAllArrivedAircraftWithinRadius = func(radius) {
+    logging.info("collecting arrived aircraft in range of "~radius);    
+    var center = getAircraftPosition();
     var aiaircrafts = props.globals.getNode("/ai/models/", 1).getChildren("aircraft");
     var idx = 0;
     foreach (var aN; aiaircrafts) {
         var callsign = getNodeValue(aN,"callsign");
         var id = getNodeValue(aN,"id");
         if (arrivedaircraft[id] == nil) {
+            # aircraft not yet collected
             var coord = getAiAircraftPosition(aN);
+            var heading = getAiAircraftHeading(aN);
             var speed = getNodeValue(aN,"velocities/true-airspeed-kt");        
             if (coord != nil and speed < 0.1) {
                 var type = findAircraftType(callsign);                                
-                if (coord.distance_to(center) < 5000 and type != nil) {
-                    logging.debug("found non moving AI " ~ callsign ~ " of type " ~ type);
-                    arrivedaircraft[id] = {node : aN, coord : coord, type : type, callsign : callsign};
-                    return arrivedaircraft[id];
+                if (coord.distance_to(center) < radius and type != nil) {
+                    logging.debug("found non moving AI " ~ callsign ~ " of type " ~ type ~ ",heading="~heading);
+                    var aircraft = buildArrivedAircraft( aN, coord, type, callsign, heading, id);
+                    arrivedaircraft[id] = aircraft;
+                    logging.info("found arrived aircraft needing service: " ~ aircraft.callsign ~ " near parkpos " ~ aircraft.nearparkpos);                    
                 }
             }
         }
+    }    
+}
+
+var buildArrivedAircraft = func(node, coord, type, callsign, heading, id) {
+    var nearparkpos = "-";
+    
+    if (groundnet != nil) {
+        var parking = groundnet.getParkPosNearCoordinates(coord);
+        if (parking != nil){
+            nearparkpos = parking.name;
+        }
+    } else {
+        logging.warn("arrived aircraft but no groundnet. possible inconsistency");        
     }
-    return nil;
-};
+    return {node : node, coord : coord, type : type, callsign : callsign, heading: heading, nearparkpos : nearparkpos, receivingservice: 0, id: id};
+}
 
 # check for empty string
 var empty = func(s) {
@@ -255,6 +297,43 @@ var empty = func(s) {
     if (size(s)==0)
         return 1;
     return 0;
+}
+
+var execDebugcmd = func(debugcmd) {
+    logging.debug("executing debugcmd: "~debugcmd);
+    if (debugcmd == "reload") {
+        var files =
+        ['main.nas','maintest.nas','util.nas','GroundVehicle.nas','Groundnet.nas','Graph.nas',
+        'mathutil.nas','GroundServiceVisualizer.nas', 'GraphUtils.nas'];
+        groundservices.shutdown();
+        foreach (f;files){
+            io.load_nasal(getprop("/sim/fg-root") ~ "/Nasal/groundservices/"~f,"groundservices");
+        }
+        groundservices.reinit();
+    }
+}
+
+var validateAltitude = func(alt) {
+    if (groundnet == nil){
+        #during testing?
+        return 0;
+    }
+    if (alt < groundnet.minaltitude or alt > groundnet.maxaltitude) {
+        logging.warn("out of range altitude " ~ alt);
+        return 1;
+    }
+    return 0;
+}
+
+var fixAltitude = func(locationXYZ) {
+    if (groundnet == nil){
+        #during testing?
+        return;
+    }
+    var coord = groundnet.projection.unproject(locationXYZ);    
+    var altinfo = getElevationForLocation(coord);
+    var alt = altinfo.alt;  
+    locationXYZ.z = alt;
 }
 
 logging.debug("completed util.nas");

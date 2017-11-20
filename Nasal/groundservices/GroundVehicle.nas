@@ -36,12 +36,13 @@ var GroundVehicle = {
         m.aiid = baseid;
         baseid = baseid +1;
         m.vhc = VehicleComponent.new(type,m.aiid);
-                
+        m.vc = VelocityComponent.new();
+
         m.ai.getNode("id", 1).setIntValue(m.aiid);
 		m.ai.getNode("vehicle", 1).setBoolValue(1);
 		m.ai.getNode("valid", 1).setBoolValue(1);
-		 
-        
+        m.ai.getNode("type", 1).setValue(type);         		
+
 		m.latN = m.ai.getNode("position/latitude-deg", 1);
 		m.lonN = m.ai.getNode("position/longitude-deg", 1);
 		m.altN = m.ai.getNode("position/altitude-ft", 1);
@@ -72,12 +73,11 @@ var GroundVehicle = {
         return GroundVehicle.active[m.aiid] = m;
 	},
 	del: func {
-		logging.debug("del");
+		#logging.debug("del");
 		me.model.remove();
 		me.ai.remove();
 		delete(GroundVehicle.active, me.aiid);
-		tanker_msg("vehicle " ~ me.aiid ~ " removed");
-        		
+		#tanker_msg("vehicle " ~ me.aiid ~ " removed");        		
 	},
 	update: func(deltatime) {
 	    var currenttime = systime();
@@ -100,16 +100,60 @@ var GroundVehicle = {
         return coord;
 	},
 	
-	moveForward: func(deltatime) {
+	moveForward: func(tpf) {
         var gmc = me.gmc;
-       
+        var vhc = me.vhc;
+        var vc = me.vc;
+        
         if (gmc.automove) {
-            var speed = me.maximumspeedN.getValue();
-            gmc.moveForward(deltatime * speed);
-            me.adjustVisual(gmc);  
+            me.adjustSpeed(gmc, vc, tpf);
+            #var speed = me.maximumspeedN.getValue();
+            var completedpath = gmc.moveForward(tpf * vc.movementSpeed);
+            me.adjustVisual(gmc);
+            if (completedpath != nil) {
+                vc.setMovementSpeed(0);
+                #if (visualizer != nil) {
+                #    visualizer.removeLayer(p.layer);
+                #}                            
+                groundnet.groundnetgraph.removeLayer(completedpath.layer);
+            }  
         }                          
     },
     
+    adjustSpeed: func(gmc, vc, deltatime) {
+        var left = gmc.getRemainingPathLen();
+        var needsbraking = 0;
+        var needsspeedup = 0;
+        var speedlimit = vc.getMaximumSpeed();
+
+        if (gmc.currentposition.currentedge.isArc() and gmc.currentposition.currentedge.radius < 15) {
+            speedlimit = vc.getMaximumSpeed() / 2;
+        }
+
+        # avoid swinging between two values
+        if (vc.getMovementSpeed() > speedlimit + 1) {
+            needsbraking = 1;
+        }
+        var breakingdistance = vc.getBrakingDistance();#10;
+        if (left < breakingdistance) {
+            logging.debug("brake due to left " ~ left~", deltatime=" ~ deltatime);
+            needsbraking = 1;
+        }
+        #accelerate?
+        if (left > breakingdistance) {
+            if (vc.getMovementSpeed() < speedlimit - 1) {
+                needsspeedup = 1;
+            }
+        }
+
+        if (needsbraking) {
+            vc.accelerate(-deltatime);
+        }
+        if (needsspeedup) {
+            vc.accelerate(deltatime);
+        }
+    },
+
     # elevation is not unique across an airport and must be updated along with the position.
     # elevation must be taken directly from some nodes z value instead of from some 3D vector calculation.
     adjustVisual: func(gmc) {         
@@ -124,7 +168,10 @@ var GroundVehicle = {
         var toalt = cp.currentedge.to.getLocation().z;
         var relpos = cp.getAbsolutePosition() / cp.currentedge.getLength();
         var alt = fromalt + ((toalt-fromalt) * relpos);
-        #logging.debug("updating vehicle altitude to " ~ alt ~ ", fromalt="~fromalt~", toalt="~toalt);
+        #logging.debug("updating vehicle altitude to " ~ alt ~ ", fromalt="~fromalt~", toalt="~toalt~",edge="~cp.currentedge.toString());
+        if (validateAltitude(alt)) {
+            logging.warn("updating vehicle to out of range altitude " ~ alt ~ ", fromalt="~fromalt~", toalt="~toalt~",edge="~cp.currentedge.toString());
+        }
         me.altN.setDoubleValue(alt * M2FT);
         
     },
@@ -136,11 +183,18 @@ var GroundVehicle = {
 		#var diff = (me.coord.alt() - me.ac.alt()) * M2FT;
 		#var qual = diff > 3000 ? " well" : abs(diff) > 1000 ? " slightly" : "";
 		#var rel = diff > 1000 ? " above" : diff < -1000 ? " below" : "";
-		var statemsg = me.vhc.state;
-		if (me.vhc.state == MOVING) {
+		var statemsg = "idle";
+		if (me.vhc.isScheduled()) {
+		    statemsg = "busy";
+		}
+		if (me.gmc.isMoving() != nil) {
+		    # might override "busy" 
 		    statemsg = "moving to node " ~ ((me.vhc.lastdestination!=nil)?me.vhc.lastdestination.getName():"");
 		}
-		atc_msg("GroundVehicle %s %s %s",me.vhc.type,me.aiid,statemsg);
+		var msg = sprintf("GroundVehicle [%d] %s %s %s",me.ai.getIndex(),me.vhc.type,me.aiid,statemsg);
+		atc_msg(msg);
+		# also report to log file, because atc messages might vanish quickly
+		logging.info(msg);
 	},
 	
 	
@@ -172,7 +226,11 @@ var GraphMovingComponent = {
     },
     	        	
     moveForward: func( amount) {
-        #logging.debug("moveForward "~amount ~ ",currentposition="~me.currentposition.toString());    
+        #logging.debug("moveForward "~amount ~ ",currentposition="~me.currentposition.toString());   
+        var pathcompleted = nil; 
+        if (me.currentposition.reversegear) {
+            amount = -amount;
+        }
         if (amount > 0) {
             me.currentposition.edgeposition += amount;
             while (me.currentposition.edgeposition > me.currentposition.currentedge.len) {
@@ -181,7 +239,7 @@ var GraphMovingComponent = {
                 if (newsegment == nil) {
                     me.currentposition.edgeposition = me.currentposition.currentedge.len;
                     if (me.path != nil) {
-                        me.movepathCompleted();
+                        pathcompleted = me.movepathCompleted();
                     }
                 } else {
                     me.adjustPositionOnNewEdge(switchnode, newsegment, me.currentposition.edgeposition - me.currentposition.currentedge.len);
@@ -197,15 +255,27 @@ var GraphMovingComponent = {
                 if (newsegment == nil) {
                     me.currentposition.edgeposition = 0;
                     if (me.path != nil) {
-                        me.movepathCompleted();
+                        pathcompleted = me.movepathCompleted();
                     }
                 } else {
                     me.adjustPositionOnNewEdge(switchnode, newsegment, math.abs(me.currentposition.edgeposition));
                 }
             }
         }
+        return pathcompleted;
     },
 
+    isMoving: func() {
+        if (0 and graphmovementdebuglog) {
+            if (me.path == nil) {
+                logging.debug("isMoving returning nil");
+            } else {
+                logging.debug("isMoving returning path");
+            }
+        }    
+        return me.path;
+    },
+    
     adjustPositionOnNewEdge: func(switchnode, newsegment, remaining) {
         var newedge = newsegment.edge;
         if ((switchnode == newedge.to and switchnode == me.currentposition.currentedge.from) or
@@ -240,7 +310,7 @@ var GraphMovingComponent = {
     
     movepathCompleted: func() {
         if (graphmovementdebuglog) {   
-            logging.info("move path completed at " ~ me.currentposition.toString());
+            logging.debug("move path completed at " ~ me.currentposition.toString());
         }
         
         if (me.path.finalposition != nil) {
@@ -256,7 +326,14 @@ var GraphMovingComponent = {
         	
     pathCompleted: func() {
         return me.path==nil;
-    },        
+    },
+    
+    getRemainingPathLen: func() {
+        if (me.path == nil){
+            return FloatMAX_VALUE;
+        }
+        return me.path.getLength(me.currentposition);
+    },
 };
 
 # Return heading in degree
@@ -300,54 +377,105 @@ var IDLE = "idle";
 var MOVING = "moving";
 var BUSY = "busy";
 
+var VEHICLE_AIRCRAFT = "aircraft";
+var VEHICLE_PUSHBACK = "pushback";
+var VEHICLE_STAIRS = "stairs";
+var VEHICLE_FUELTRUCK = "fueltruck";
+var VEHICLE_CATERING = "catering";
+
 var VehicleComponent = {
     
     new: func(type,aiid) {	    
 	    var obj = { parents: [VehicleComponent] };
-	    obj.state = IDLE;
 	    obj.statechangetimestamp = 0;
 	    obj.type = type;
 	    # lastdestination is a GraphNode
 	    obj.lastdestination=nil;
-	    obj.path = nil;
+	    #obj.path = nil;
 	    obj.aiid = aiid;
 	    obj.createtimestamp = systime();
+	    obj.schedule = nil;
+		return obj;
+	},
+		    
+    isScheduled: func() {
+        return me.schedule != nil;
+    },
+    
+    isIdle: func() {
+        return me.schedule == nil;
+    }, 	
+};
+
+var VelocityComponent = {
+    
+    new: func() {	    
+	    var obj = { parents: [VelocityComponent] };
+	    # unit is m/s 
+        obj.movementSpeed = 0.0;
+        obj.maximumSpeed = 10.0;
+        obj.acceleration = 1.0;
+        obj.deceleration = 2.5;
 		return obj;
 	},
 	
-	expiredIdle: func(maxidletime) {
-	    #logging.debug("currentstate is "~me.state);
-	
-        if (me.state != IDLE){
-            return 0;
-        }
-        if (me.statechangetimestamp + maxidletime < systime()) {
-            return 1;
-        }
-        return 0;
+    setMovementSpeed: func(movementSpeed) {
+        me.movementSpeed = movementSpeed;
     },
-            
-    setStateMoving: func( path) {
-        logging.info("vehicle "~me.aiid~" starts moving on path " ~ path.toString());    
-        me.state = MOVING;
-        me.statechangetimestamp = systime();
-        me.path = path;
+
+    incMovementSpeed: func(offset) {
+        me.movementSpeed += offset;
     },
-    
-    setStateIdle: func() {
-        me.state = IDLE;
-        me.path = nil;
-        me.statechangetimestamp = systime();
+
+    getMovementSpeed: func() {
+        return me.movementSpeed;
+    },
+
+    setMaximumSpeed: func(maximumSpeed) {
+        me.maximumSpeed = maximumSpeed;
+    },
+
+    setAcceleration: func(acceleration) {
+        me.acceleration = acceleration;
+        #braking iost stronger tahn accelerate
+        me.deceleration = acceleration * 2.5;
+    },
+
+    accelerate: func(deltatime) {
+        if (deltatime < 0) {
+            # no absolute stop, otherwise destination will not be reached
+            var diff = me.deceleration * deltatime;
+            me.movementSpeed += diff;
+            #logger.debug("accelerate:diff=" + diff + ",movementSpeed=" + movementSpeed + ",acceleration=" + acceleration);
+            if (me.movementSpeed < 1) {
+                me.movementSpeed = 1;
+            }
+        } else {
+            me.movementSpeed += me.acceleration * deltatime;
+        }
+        #logging.debug("accelerate: speed="~me.movementSpeed);        
     },    
-    
-    setStateBusy: func() {
-        me.state = BUSY;
+
+    getMaximumSpeed: func() {
+        return me.maximumSpeed;
     },
-        
-    isMoving: func() {
-        return me.path;
-    } ,       	    	        	
+    
+    getBrakingDistance: func() {
+        return 0.5 *  (me.movementSpeed * me.movementSpeed / me.deceleration);
+    },
 };
 
+# Only return idle vehicles because moving ones cannot relocated (due to unknwon layer)
+var findAvailableVehicle = func(vehicletype) {
+    foreach (var v; values(GroundVehicle.active)) {
+        var vhc = v.vhc;
+        var gmc = v.gmc;
+        if (vhc.type == vehicletype and vhc.isIdle() and gmc.isMoving() == nil) {
+            return v;
+        }
+    }
+    return nil;
+};
+    
 logging.debug("completed GroundVehicle.nas");
 

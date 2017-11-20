@@ -37,7 +37,7 @@ var Vector3 = {
     
     #rotate by degree
     rotate: func(degree) {
-        #logging.debug("rotate: degree="~degree);
+        #logging.debug("Vector3:rotate: degree="~degree);
     
         var rad = radianFromDegree(degree);
         var rotXY = rotateXY(me.x,me.y,rad);   
@@ -134,6 +134,7 @@ var getHeadingFromDirection = func(vXY) {
 # Result is normalized.
 # No deflection(?) compensation!
 var getDirectionFromHeading = func(degree) {
+    #logging.debug("getDirectionFromHeading: degree="~degree);
     var rad = -radianFromDegree(degree);
     var x = -math.sin(rad);
     var y = math.cos(rad);
@@ -203,7 +204,7 @@ var Vector2 = {
     
 	#rotate by degree
     rotate: func(degree) {
-        #logging.debug("rotate: degree="~degree);
+        #logging.debug("Vector2:rotate: degree="~degree);
     
         var rad = radianFromDegree(degree);
         var rotXY = rotateXY(me.x,me.y,rad);   
@@ -212,7 +213,29 @@ var Vector2 = {
   
     negate: func() {
         return Vector2.new( -me.x, -me.y);
-    },   
+    },
+    
+    length: func () {
+        return math.sqrt(me.x * me.x + me.y * me.y);
+    },
+        
+    normalize: func () {
+        var len = me.length();
+        if (math.abs(len) < 0.0000001) {
+            return me.clone();
+        }
+        var no = me.divideScalar(len);
+        return no;
+    },
+    
+    divideScalar: func( scalar) {
+        var invScalar = 1.0 / scalar;
+        return Vector2.new( me.x* invScalar, me.y * invScalar);
+    },
+        
+    clone: func() {
+        return Vector2.new( me.x, me.y);
+    },
 };
     
 var buildFromVector2 = func (vXY) {

@@ -44,6 +44,7 @@ var extendWithEdge = func(graph, edge, len, layer) {
     var dir = edge.getDirection();
     var destination = toloc.add(dir.normalize().multiply(len));
     var destnode = graph.addNode("", destination);
+    fixAltitude(destnode.locationXYZ);        
     var e = graph.connectNodes(edge.to, destnode, "", layer);
     return e;
 };
@@ -51,6 +52,11 @@ var extendWithEdge = func(graph, edge, len, layer) {
 # Caclulation of an circle embedded in an angle. Either inner arc (covering beta) shortening v1->v2 or outer arc (covering alpha) reconnecting v2->v1
 var calcArcParameter = func(   start,  e1,  intersection,  e2,  end,  radius,  inner,  radiusisdistance) {
     #logging.debug("building arc from " ~ start.getName() ~ start.getLocation().toString() ~ " on " ~ e1.toString() ~ " by " ~ intersection.getLocation().toString() ~ " on " ~ e2.toString() ~ " to " ~ end.getName() ~ end.getLocation().toString());
+    if (validateAltitude(intersection.z)){
+        #the reason is still unknown TODO
+        logging.warn("fixing out of range altitude in intersection");
+        intersection.z = (start.getLocation().z + end.getLocation().z)/2;
+    }
     var v1 = e1.getEffectiveOutboundDirection(start);
     var v2 = e2.getEffectiveInboundDirection(end);
     var alpha = PI - getAngleBetween(v1, v2);
@@ -146,6 +152,7 @@ var createBranch = func( graph,  node,  edge,  branchlen,  angle,  layer) {
 var extend = func( graph,  node,  dir ,  len,  layer) {
     dir = dir.multiply(len);
     var destination = graph.addNode("ex", node.getLocation().add(dir));
+    fixAltitude(destination.locationXYZ);
     var branch = graph.connectNodes(node, destination, "", layer);
     return branch;
 }
@@ -217,15 +224,19 @@ var createPathFromGraphPosition = func( graph,  from,  to,  graphWeightProvider,
         logging.warn("no path found");                
         return nil;
     }
-    if (graphutilsdebuglog) {
-        logging.debug("createPathFromGraphPosition: from " ~ from.toString() ~ ",nextnode=" ~ nextnode.toString() ~ ",path=" ~ path.toString());
-    }
+    #if (graphutilsdebuglog) {
+        logging.info("createPathFromGraphPosition: from " ~ from.toString() ~ ",nextnode=" ~ nextnode.toString() ~ ",path=" ~ path.toString());
+    #}
     if (path.getSegmentCount() == 0) {
         logging.warn("no path found");
         return nil;
     }
     path = bypassShorties(graph, path, minimumlen, layer);
-    
+    if (path.getSegmentCount() == 0) {
+        logging.warn("bypassShorties returned empty path");
+        return nil;
+    }
+            
     var smoothedpath = GraphPath.new(path.start, layer);
     smoothedpath.finalposition = buildPositionAtNode(path.getLast().edge,to,0);
     if (graphutilsdebuglog) {
@@ -296,26 +307,35 @@ var bypassShorties = func( graph,  path,  minimumlen,  layer) {
         if (segment.edge.getLayer() == 0 and segment.edge.getLength() < minimumlen and i < path.getSegmentCount() - 1) {
             if (i == 0) {
                 # bypass ahead
+                if (graphutilsdebuglog) {
+                #    logging.debug("bypass ahead. segment "~i);
+                }
                 var nextsegment = path.getSegment(i + 1);
-                if (validateObject(lastsegment,"lastsegment","GraphPathSegment")) {
-                    logging.error("validate of lastsegment failed");
-                    return np;
-                }
-                if (validateObject(nextsegment,"nextsegment","GraphPathSegment")) {
-                    logging.error("validate of nextsegment failed");
-                    return np;
-                }
+                #if (validateObject(lastsegment,"lastsegment","GraphPathSegment")) {
+                #    logging.error("validate of lastsegment failed");
+                #    return np;
+                #}
+                #if (validateObject(nextsegment,"nextsegment","GraphPathSegment")) {
+                #    logging.error("validate of nextsegment failed");
+                #    return np;
+                #}
                 var bypass = graph.connectNodes(path.getSegment(0).enternode, nextsegment.getLeaveNode(), "bypass", layer);
                 lastsegment = GraphPathSegment.new(bypass, path.getSegment(0).enternode);
                 np.addSegment(lastsegment);
                 i+=1;
             } else {
                 # bypass back
+                if (graphutilsdebuglog) {
+                    #logging.debug("bypass back. segment "~i);
+                }
                 var bypass = graph.connectNodes(lastsegment.enternode, segment.getLeaveNode(), "bypass", layer);
                 lastsegment = GraphPathSegment.new(bypass, lastsegment.enternode);
                 np.replaceLast(GraphTransition.new(lastsegment));
             }
-        } else {                        
+        } else {   
+            if (graphutilsdebuglog) {
+                #logging.debug("no bypass. segment "~i);
+            }                     
             np.addSegment(segment);
             lastsegment = segment;
         }
@@ -435,7 +455,9 @@ createTransition = func( graph,  from,  destinationedge,  destinationnode,  smoo
         return gt;
     }
 
-    logging.debug("created no transition");
+    if (graphutilsdebuglog) {
+        logging.warn("created no transition");
+    }
     return nil;
 };
 

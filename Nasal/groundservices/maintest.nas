@@ -4,6 +4,9 @@
 
 logging.debug("executing maintest.nas");
 
+var unittesting = 0;
+var virtualtestingaltitude = 448;
+
 var assertEquals = func (label,expected,actual) {
 	if (expected != actual){
 	    logging.error(label ~ ": expected "~expected~", actual "~actual);
@@ -22,6 +25,11 @@ var assertVector3 = func (label,expected,actual,epsilon=0.000003) {
 	assertFloat(label~".x",expected.x,actual.x,epsilon);
     assertFloat(label~".y",expected.y,actual.y,epsilon);
     assertFloat(label~".z",expected.z,actual.z,epsilon);
+}
+
+var assertVector2 = func (label,expected,actual,epsilon=0.000003) {
+	assertFloat(label~".x",expected.x,actual.x,epsilon);
+    assertFloat(label~".y",expected.y,actual.y,epsilon);    
 }
 
 var assertNotNull = func (label,obj) {
@@ -63,7 +71,7 @@ var loadGroundNetForTest = func(icao) {
 var groundnetEDDKTest = func() {
     logging.debug("running groundnetEDDKTest");
     var groundnet = loadGroundNetForTest("EDDK");
-    assertVector3("node0",Vector3.new(-1889.7698,-295.14346,0),groundnet.groundnetgraph.getNode(0).getLocation(),0.5);            
+    assertVector3("node0",Vector3.new(-1889.7698,-295.14346,virtualtestingaltitude),groundnet.groundnetgraph.getNode(0).getLocation(),0.5);            
     assertEquals("nodes",241,groundnet.groundnetgraph.getNodeCount());
     if (assertEquals("edges",269,groundnet.groundnetgraph.getEdgeCount())) {
         #useless. groundet doesn't fit
@@ -156,8 +164,8 @@ var testServicePoint747_B2 = func() {
     var groundnet = loadGroundNetForTest("EDDK");
         
     var b_2 = groundnet.getParkPos("B_2");
-    var sp = ServicePoint.new(groundnet, nil, b_2.node.getLocation(), b_2.heading, getAircraftConfiguration("747-400"));
-    assertVector3("wolrddorrpos",Vector3.new(-1698.4425,1320.0948,0),sp.worlddoorpos,0.1);
+    var sp = ServicePoint.new(groundnet, {type:"747-400", coord:geo.Coord.new()}, b_2.node.getLocation(), b_2.heading, getAircraftConfiguration("747-400"));
+    assertVector3("prjdoorpos",Vector3.new(-1698.4425,1320.0948,virtualtestingaltitude),sp.prjdoorpos,0.1);
     assertEquals("wingreturnlayer",4,sp.wingreturn.getLayer());
     
     var wingapproachlen = sp.wingapproach.getLength();
@@ -177,20 +185,75 @@ var testServicePoint747_B2 = func() {
     # now from A20. Catering must not move beneath aircraft
     start = GraphPosition.new(groundnet.groundnetgraph.findEdgeByName("1-201"));
     path = sp.getApproach(start, sp.doorEdge.from, 0);
-    assertEquals("path", "201:e1->turnloop.smootharc(9)->e2(20)->201-63(23)->63-69(59)->68-69(21)->129-68(91)->129-130(169)->130-131(27)->101-131(100)->branchedge(16)->wingedge(16)->door2wing(27)->(16)", path.toString());
+    assertEquals("path", "201:e1->turnloop.smootharc(9)->e2(20)->201-63(23)->63-69(59)->68-69(21)->129-68(91)->129-130(169)->130-131(27)->101-131(100)->branchedge(16)->wingedge(16)->door2wing(26)->dooredge(16)", path.toString());
     path = sp.getApproach(start, sp.wingedge.to, 0);
-            
+    
+    var schedule = Schedule.new(sp, groundnet);
+    schedule.addAction(VehicleOrderAction.new(schedule, VEHICLE_CATERING, sp.doorEdge.from));
+    schedule.addAction(VehicleServiceAction.new(schedule,2));
+    schedule.addAction(VehicleReturnAction.new(schedule, 1,sp,1));
+    schedule = Schedule.new(sp, groundnet);
+    schedule.addAction(VehicleOrderAction.new(schedule, VEHICLE_FUELTRUCK, sp.wingedge.to));
+    schedule.addAction(VehicleServiceAction.new(schedule,2));
+    schedule.addAction(VehicleReturnAction.new(schedule, 0,sp,0));
+    sp.delete();
+    assertEquals("edges", 269, groundnet.groundnetgraph.getEdgeCount());
     logging.debug("finished testServicePoint747_B2");
 };
-    
+
+var testServicePoint737_C4 = func() {
+    logging.debug("running testServicePoint737_C4");
+    var groundnet = loadGroundNetForTest("EDDK");
+        
+    var c_4 = groundnet.getParkPos("C_4");
+    var sp = ServicePoint.new(groundnet, {type:"738", coord:geo.Coord.new()}, c_4.node.getLocation(), c_4.heading, getAircraftConfiguration("738"));
+    assertVector3("prjdoorpos",Vector3.new(-1605.639057507902,1535.3408,virtualtestingaltitude),sp.prjdoorpos,0.1);
+    assertVector2("prjleftwingapproachpoint",Vector2.new(-1592.258,1519.9026),sp.prjleftwingapproachpoint,0.1);
+    assertEquals("wingreturnlayer",4,sp.wingreturn.getLayer());
+    assertVector3("wingedge.from",Vector3.new(-1592.258,1519.9026,virtualtestingaltitude),sp.wingedge.from.getLocation(),0.1);
+    assertVector3("wingedge.to",Vector3.new(-1591.56,1499.9138,virtualtestingaltitude),sp.wingedge.to.getLocation(),0.1);
+    assertFloat("wingedge.length", MINIMUMPATHSEGMENTLEN, sp.wingedge.getLength(),0.1);            
+    assertVector3("wingreturn1.from",Vector3.new(-1591.211,1489.919,virtualtestingaltitude),sp.wingreturn1.from.getLocation(),0.1);
+    assertVector3("wingreturn1.to",Vector3.new(-1572.19,1483.7386,virtualtestingaltitude),sp.wingreturn1.to.getLocation(),0.1);
+
+    var wingapproachlen = sp.wingapproach.getLength();
+    assertFloat("wingapproachlen", 30, wingapproachlen);
+    assertVector2("prjrearpoint",Vector2.new(-1570.4719,1522.2318),sp.prjrearpoint,0.2);
+    var doorbranchedgelen = sp.doorbranchedge.getLength();
+    assertFloat("doorbranchedgelen", 152.25296, doorbranchedgelen,0.1);
+    var wingbranchedgelen = sp.wingbranchedge.getLength();
+    assertFloat("wingbranchedgelen", 129.43648, wingbranchedgelen,0.1);
+    assertEquals("wingbestHitEdge", "134-124(134->124)", sp.wingbestHitEdge.toString());
+
+    # fuel truck approach. 
+    var start = GraphPosition.new(groundnet.groundnetgraph.findEdgeByName("129-130"));
+    # first without smoothing.
+    var path = sp.getApproach(start, sp.wingedge.to, 0);
+    assertEquals("path", "130:130-131->131-132(107)->bypass(62)->134-124(93)->branchedge(129)->wingapproach(30)->wingedge(20)", path.toString());
+    # back path
+    path = sp.getWingReturnPath(0);
+    assertEquals("path", "outernode:return0->return1(20)->bypass(47)->bypass(110)->bypass(106)->132-133(48)->131-132(107)->130-131(27)->129-130(169)->129-68(91)->68-69(21)->63-69(59)->1-63(28)", path.toString());
+    sp.delete();
+    assertEquals("edges", 269, groundnet.groundnetgraph.getEdgeCount());           
+    logging.debug("finished testServicePoint737_C4");
+}
+
 var maintest = func {
 	logging.debug("running maintest");
+	unittesting = 1;
 	
 	miscTest();
     groundnetEDDKTest();
     groundnetOtherTest();
     testServicePoint747_B2();
+    testServicePoint737_C4();
     logging.debug("maintest completed");
+    cleanupTest();
+    unittesting = 0;
+};
+
+var cleanupTest = func() {
+    schedulesN.removeChildren("schedule");
 };
 
 # from props.dump

@@ -3,13 +3,15 @@
 #
 
 var first = 1;
+#var logfilename = "nasal.log";
+var logfilename = "groundservices.log";
 
 var logwrite = func (level,msg){
-    var currenttime = systime();
+    var currenttime = math.round(systime());
     var seconds = math.mod(math.round(currenttime ), 60);
     var minute = math.mod(math.round(currenttime / (60)), 60);
     var hour = math.mod(math.round(currenttime / (60*60)), 24);
-    var filename = props.getNode("/sim/fg-home").getValue() ~ "/nasal.log";
+    var filename = props.getNode("/sim/fg-home").getValue() ~ "/" ~ logfilename;
     var logfp = nil;
     if (first) {
         first = 0;

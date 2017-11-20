@@ -8,6 +8,16 @@
     <config>
         <!--should vehicles start moving around on their own without being requested-->
         <automove>1</automove>
+        <!--should detected arrived aircraft get service automatically-->
+        <autoservice>1</autoservice>
+        <!-- the value depends on the available vehicles for service. Each service point needs on ecaterer and one fuel truck-->
+        <maxservicepoints>3</maxservicepoints>
+        <scalefactor>200</scalefactor>
+        <!-- distance of model center to loading edge. Should be vehicle specific. -->
+        <approachoffset>2.9</approachoffset>
+        <!--service duration in seconds. is unrealistic short for now for having more activity-->
+        <cateringduration>90</cateringduration>
+        <fuelingduration>120</fuelingduration>
     </config>
     <vehicle>
         <name>Goldhofert</name>
@@ -22,16 +32,16 @@
         <name>FollowMe</name>
         <type>followme</type>
         <model>Models/GroundServices/Followme/followme.xml</model>
-        <initialcount>5</initialcount>
+        <initialcount>3</initialcount>
         <maximumspeed>7.1</maximumspeed>
         <acceleration>4.5</acceleration>
     </vehicle>
 
     <vehicle>
         <name>Volvo Fuel Truck</name>
-        <type>fuel</type>
+        <type>fueltruck</type>
         <model>Models/GroundServices/FuelTruck/Fuel_Truck_Short_VolvoFM.xml</model>
-        <initialcount>3</initialcount>
+        <initialcount>5</initialcount>
         <maximumspeed>6.1</maximumspeed>
         <acceleration>1.3</acceleration>
     </vehicle>
@@ -40,7 +50,7 @@
         <name>Catering Truck</name>
         <type>catering</type>
         <model>Models/GroundServices/Catering/catruckmed-lsg1.xml</model>
-        <initialcount>4</initialcount>
+        <initialcount>5</initialcount>
         <maximumspeed>6.1</maximumspeed>
         <acceleration>1.5</acceleration>
     </vehicle>
@@ -87,6 +97,24 @@
             <x>-20.38</x>
             <y>-2.89</y>
             <z>-0.24</z>
+        </door>
+    </aircraft>
+    <aircraft>
+        <type>738</type>
+        <wingspread>35.79</wingspread>
+        <wingpassingpoint>
+            <x>4</x>
+            <y>19</y>
+        </wingpassingpoint>
+        <leftwingapproachpoint>
+            <x>8</x>
+            <y>-8.9475</y>
+        </leftwingapproachpoint>
+        <!--first door is expected to be front left-->
+        <door>
+            <x>-9.49</x>
+            <y>-1.6024</y>
+            <z>3</z>
         </door>
     </aircraft>
 </PropertyList>
