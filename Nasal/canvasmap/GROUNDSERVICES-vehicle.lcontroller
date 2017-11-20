@@ -1,0 +1,101 @@
+# derived from TFC layer
+# requires a patch to function aircraftpos.controller:update_quickly() for being updated regularly:
+#  	"GROUNDSERVICES-vehicle","TFC", "FLT",
+#
+# Class things:
+var name = 'GROUNDSERVICES-vehicle';
+var parents = [SymbolLayer.Controller];
+var __self__ = caller(0)[0];
+SymbolLayer.Controller.add(name, __self__);
+SymbolLayer.add(name, {
+	parents: [MultiSymbolLayer],
+	type: name, # Symbol type
+	df_controller: __self__, # controller to use by default -- this one
+});
+
+var model_root = props.globals.getNode("/ai/models/");
+
+var new = func(layer) {
+	var m = {
+		parents: [__self__],
+		layer: layer,
+		map: layer.map,
+		listeners: [],		
+	};
+	layer.searcher._equals = func(l,r) l.equals(r);
+	m.addVisibilityListener();
+
+	return m;
+};
+
+var del = func() {
+	foreach (var l; me.listeners)
+		removelistener(l);
+};
+
+var MapElement = {
+	new: func(node, categorie="i", layer=nil) {
+		var id = node.getValue("id");
+		var m = {
+			# Note: because this inherits from props.Node, Symbol.Controller.equals
+			# will call l.equals(r) -- the one defined below
+			parents: [MapElement, geo.Coord, node], # note we don't implement a full geo.Coord API
+			id: id,
+			node: node,
+			pos: node.getNode("position",1),
+			type: node.getValue("type"),
+			categorie: categorie,
+		};
+		#logging.debug("found id "~m.id~" "~m.type);
+		return m;
+	},
+	equals: func(other) other.id == me.id,
+	latlon: func() { # this makes sure to look like a geo.Coord to MapStructure, but will internally use the AI/MP traffic properties instead
+	    #logging.debug("latlonalt:"~me.pos.getValue("latitude-deg")~" "~me.pos.getValue("longitude-deg")~" " ~me.pos.getValue("altitude-ft"));
+		return [
+			me.pos.getValue("latitude-deg"),
+			me.pos.getValue("longitude-deg"),
+			me.pos.getValue("altitude-ft")
+		];
+	},
+	getCategorie: func() {
+	    return me.categorie;	
+	},
+};
+
+var searchCmd = func {
+	#logging.debug( "Doing query: "~name);
+
+	if (me.map.getRange() == nil) return;
+
+	var result = [];
+	var models = 0;
+
+	foreach (var t; model_root.getChildren("gsvehicle")) {
+		if (!t.getValue("valid"))
+		    continue;
+		var t_id = t.getNode("id");
+		if (t_id == nil or t_id.getValue() == -1)
+		    continue;
+		models += 1;
+		var (lat,lon) = (t.getValue("position/latitude-deg"),
+		                 t.getValue("position/longitude-deg"));
+		if (lat == nil or lon == nil) {
+			logging.warn("alert", "lat/lon was nil for AI node "~t.getPath());
+			continue;
+		}
+		var categorie = 'i';
+		if (me.map.controller.in_range(lat, lon)) {
+		    #TODO set categorie
+			append(result, MapElement.new(t, categorie, me.layer));
+        }
+	}
+	# TODO sp id might be equal to vehicle id
+	foreach (var t; groundservices.servicepointsN.getChildren("servicepoint")) {    	
+        append(result, MapElement.new(t, "s", me.layer));
+    }
+
+	#logging.debug("Found "~size(result)~" VehicleModel's in range out of "~models~" total.");
+	return result;
+};
+

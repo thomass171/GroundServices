@@ -1,0 +1,58 @@
+# derived from TFC layer
+# Class things:
+var name = 'GROUNDSERVICES-vehicle';
+var parents = [DotSym];
+var __self__ = caller(0)[0];
+DotSym.makeinstance( name, __self__ );
+
+SymbolLayer.get(name).df_style = { # style to use by default
+	line_width: 1,
+	scale_factor: 1,	
+	color_default: [1,1,1]
+};
+
+var element_type = "group"; # we want a group, becomes "me.element"
+var icon = nil;
+var iconsize = 3;
+var color = [0,0,1];
+var colorIdle = [0,1,0];
+var colorMoving = [0,1,0.5];
+var colorBusy = [1,0.5,0];
+var colorSP = [0,1,1];
+
+var draw = func {
+	
+	#var callsign = me.model.getNode("callsign").getValue();
+	# print("Drawing traffic for:", callsign );
+	var categorie = me.model.getCategorie();
+	#logging.debug("draw:categorie="~categorie);
+	var c = color;
+	if (categorie == 'i') {
+	    #logging.debug("draw:idle");
+	    c = colorIdle;
+	} else if (categorie == 'm') {
+        c = colorMoving;
+    } else if (categorie == 'b') {
+        c = [1,0.7,1];
+    } else if (categorie == 's') {
+        c = [1,0,1];
+    }
+    if (me.icon == nil) {
+	    #logging.debug("drawing icon");
+		me.icon = me.element.createChild("path").setStrokeLineWidth(3);
+		me.icon.moveTo(-iconsize,0)
+        	.lineTo(0,-iconsize)
+        	.lineTo(iconsize,0)
+        	.lineTo(0,iconsize)
+        	.close();
+	    me.icon.setColor(c);
+	    me.icon.setColorFill(c);
+	    me.color=c;        	
+	}
+	if (me.color != c) {
+	    me.icon.setColor(c);
+        me.icon.setColorFill(c);
+        me.color=c;
+	}
+};
+

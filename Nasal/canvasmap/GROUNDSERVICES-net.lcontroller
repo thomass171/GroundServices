@@ -1,0 +1,56 @@
+# derived/copied from RTE layer
+# 
+# Class things:
+var name = 'GROUNDSERVICES-net';
+var parents = [SymbolLayer.Controller];
+var __self__ = caller(0)[0];
+SymbolLayer.Controller.add(name, __self__);
+SymbolLayer.add(name, {
+	parents: [MultiSymbolLayer],
+	type: name, # Symbol type
+	df_controller: __self__, # controller to use by default -- this one
+	df_options: {}
+});
+
+var new = func(layer) {
+	var m = {
+		parents: [__self__],
+		layer: layer,
+		map: layer.map,
+		listeners: [],
+	};
+	layer.searcher._equals = func(l,r) 0; 	
+	m.addVisibilityListener();
+	return m;
+};
+
+var del = func() {
+	foreach (var l; me.listeners)
+		removelistener(l);
+};
+
+var searchCmd = func {
+	var edges = [];
+	foreach (var edge; groundservices.groundnet.groundnetgraph.edges) {
+        if (edge.getLayer()==0) {
+            var coords = [];
+            
+            coords ~= [{lon:edge.from.coord.lon(), lat:edge.from.coord.lat()}];
+            coords ~= [{lon:edge.to.coord.lon(), lat:edge.to.coord.lat()}];
+                        
+            #logging.debug("coords=" ~ edge.from.coord.lat()~" "~edge.from.coord.lon());
+                                                                                                    
+            append(edges, {
+                id: edge.getId(),
+                path: coords,
+                equals: func(o){
+                    me.id == o.id
+                }
+            });
+		}
+	}
+	#logging.debug("edges="~size(edges));
+	
+	return edges;
+};
+
