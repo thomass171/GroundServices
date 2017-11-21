@@ -61,7 +61,7 @@ var assertA20position = func(a20position) {
 
 var loadGroundNetForTest = func(icao) {
     var projection = Projection.new(geo.Coord.new().set_latlon(50.86538,7.139103));   
-    var data = loadGroundnet(getprop("/sim/fg-root") ~ "/Nasal/groundservices/test/"~icao~"-refgroundnet.xml");
+    var data = loadGroundnet(root ~ "/Nasal/groundservices/test/"~icao~"-refgroundnet.xml");
     var groundnet = Groundnet.new(projection, data.getChild("groundnet"), "A20");
     return groundnet;
 };

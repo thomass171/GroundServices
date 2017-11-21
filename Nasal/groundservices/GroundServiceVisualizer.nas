@@ -49,7 +49,7 @@ var removeGroundnetModel = func(){
 var setMarkerAtLocation = func(locationXYZ,markerindex,segment=-1,heading=0) {
     var model = nil;
     if (markerindex == -1){
-        model = "Models/GroundServices/markerpool/segment"~segment~".ac";
+        model = root ~ "/Models/GroundServices/markerpool/segment"~segment~".ac";
     } else {
         model = props.globals.getNode("/sim/ai/groundservices/marker["~markerindex~"]/model",1).getValue();
     }

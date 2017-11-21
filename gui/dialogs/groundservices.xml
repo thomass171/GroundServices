@@ -23,7 +23,7 @@
 
             var select_vehicle = func() {
             var name = getprop("/sim/gui/dialogs/groundservices/selected-vehicle");
-            logging.debug("selected_vehicle: " ~ name);
+            #groundservices.logger.debug("selected_vehicle: " ~ name);
             foreach (var t; groundserviceslist) {
             if (name == t.getNode("name", 1).getValue()) {
             select_vehicle_node = t;
@@ -36,20 +36,20 @@
             if (select_vehicle_node != nil){
             sai = select_vehicle_node.getIndex();
             }
-            logging.debug("gui:generate_groundservice "~ sai);
+            #groundservices.logger.debug("gui:generate_groundservice "~ sai);
             if (sai != -1){
             groundservices.createVehicle(sai);
             }
             }
 
             var generate_move = func(parkpos) {
-            logging.debug("gui:generate_move " ~ parkpos);
+            #groundservices.logger.debug("gui:generate_move " ~ parkpos);
             groundservice.requestMove(1,parkpos);
             }
 
             # fill combo box of arrived aircraft
             var k = keys(groundservices.arrivedaircraft);
-            logging.debug("gui:aircrafts: " ~ size(k));
+            #groundservices.logger.debug("gui:aircrafts: " ~ size(k));
 
             if (size(k) > 0) {
             var combo = gui.findElementByName(dlgRoot, "aircraft-combo");

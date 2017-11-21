@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+
+<PropertyList>
+  <sim>
+    <ai>
+      <groundservices include="AI/groundservices.xml"/>
+    </ai>
+  </sim>
+</PropertyList>

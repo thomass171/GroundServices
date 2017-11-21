@@ -54,7 +54,7 @@ var GroundVehicle = {
 		
 		# link nodes from current "/ai/models/gsvehicle" to corresponding "/models/model[]" entry                
 		
-		m.model.getNode("path", 1).setValue(model);
+		m.model.getNode("path", 1).setValue(root~"/"~model);
 		m.model.getNode("latitude-deg-prop", 1).setValue(m.latN.getPath());
 		m.model.getNode("longitude-deg-prop", 1).setValue(m.lonN.getPath());
 		m.model.getNode("elevation-ft-prop", 1).setValue(m.altN.getPath());
@@ -192,7 +192,8 @@ var GroundVehicle = {
 		    statemsg = "moving to node " ~ ((me.vhc.lastdestination!=nil)?me.vhc.lastdestination.getName():"");
 		}
 		var msg = sprintf("GroundVehicle [%d] %s %s %s",me.ai.getIndex(),me.vhc.type,me.aiid,statemsg);
-		atc_msg(msg);
+		#no longer use atc msg because of spoken atc
+		#atc_msg(msg);
 		# also report to log file, because atc messages might vanish quickly
 		logging.info(msg);
 	},

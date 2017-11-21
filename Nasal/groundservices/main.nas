@@ -11,6 +11,8 @@ var showTestMessage = func(msg) {
 	gui.popupTip("Graph Test Message: " ~ msg);
 }
 
+#root path of addon
+var root = nil;
 var modulename = "main";
 
 
@@ -70,7 +72,7 @@ var collectradius = 500;
 
 
 var report = func {
-    atc_msg("Ground Service Status: "~statusNode.getValue());
+    #atc_msg("Ground Service Status: "~statusNode.getValue());
     foreach (var v; values(GroundVehicle.active))
 	    v.report();
 }
@@ -600,11 +602,12 @@ var reinit = func {
     update();
 }
 
-setlistener("/nasal/groundservices/loaded", func {
-    logging.debug("main: module groundservices loaded");
+#20.11.17:not used in addon
+#setlistener("/nasal/groundservices/loaded", func {
+#    logging.debug("main: module groundservices loaded");
     #not used currently initremoteeventhandler();
-    reinit();
-});
+#    reinit();
+#});
 
 #_setlistener("/sim/signals/nasal-dir-initialized", func {
 	#var aar_capable = true;

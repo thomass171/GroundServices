@@ -201,7 +201,7 @@ var getNodeValue = func(node, nodename, defaultvalue = 0) {
 
 var findAircraftType = func(callsign) {
     if (size(knowncallsigns) == 0) {
-        var path = getprop("/sim/fg-root") ~ "/Models/GroundServices/callsignmap.txt";
+        var path = root ~ "/Models/GroundServices/callsignmap.txt";
         var file = io.open(path);
         var line = io.readln(file);
         while (line != nil) {
