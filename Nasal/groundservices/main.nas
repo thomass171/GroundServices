@@ -148,11 +148,13 @@ var createVehicle = func(sim_ai_index, graphposition=nil, delay=0) {
     if (graphposition == nil){
 	    logging.debug("no position. using home ");
 	    var home = groundnet.getVehicleHome();
-	    graphposition = groundnet.getParkingPosition(home);
+	    if (home != nil) {
+            graphposition = groundnet.getParkingPosition(home);            
+	    } 
 	    if (graphposition == nil) {
-	        logging.warn("still no position. No vehicle created.");
-	        return;
-	    }
+            logging.warn("still no position. No vehicle created.");
+            return;
+        }
 	}
     gmc = GraphMovingComponent.new(nil,nil,graphposition);	
 	GroundVehicle.new( model, gmc, maximumspeed, type,delay);
@@ -525,6 +527,7 @@ var standby = func() {
 
 # check whether change to state active is possible. Requires airport nearby and
 # elevation data available
+# Return 1 if wakeup is possible, 0 otherwise
 var checkWakeup = func() {
     if (statusNode.getValue() != "standby") {
         logging.warn("Ignoring wakeup due to state " ~ statusNode.getValue());
@@ -534,7 +537,7 @@ var checkWakeup = func() {
         var icao = airportNode.getValue();
         projection = Projection.new(center);   
         var altinfo = getElevationForLocation(center);
-                    
+        # airport can only be used if scenery is loaded (for elevation data)
         if (!altinfo.needsupdate) {
             var subpath = chr(icao[0]) ~ "/" ~ chr(icao[1]) ~ "/" ~ chr(icao[2]) ~ "/" ~ icao;
             var path = findGroundnetXml("Airports/" ~ subpath ~ ".groundnet.xml");        
@@ -545,9 +548,9 @@ var checkWakeup = func() {
             }
             var data = loadGroundnet(path); 
             if (data == nil) {
-                logging.error("no groundnet for airport " ~ icao ~ ". Added to ignorelist");
+                logging.warn("no groundnet for airport " ~ icao ~ ". Added to ignorelist");
                 failedairports[icao] = icao;
-                return;    
+                return 0;    
             }
             var homenode = props.globals.getNode("/sim/ai/groundservices/airports/" ~ icao ~ "/home",0);
             homename = nil;
@@ -559,7 +562,12 @@ var checkWakeup = func() {
             groundnet = Groundnet.new(projection, data.getChild("groundnet"), homename);
             logging.info("groundnet loaded from "~path);
             logging.info("groundnet graph has "~groundnet.groundnetgraph.getEdgeCount()~" edges");
-            
+            if (groundnet.groundnetgraph.getEdgeCount() == 0) {
+                logging.warn("no edges in groundnet for airport " ~ icao ~ ". Added to ignorelist");
+                failedairports[icao] = icao;
+                return 0;    
+            }
+                        
             # read destination list
             destinationlist=[];
             var destinationlistnode = props.globals.getNode("/sim/ai/groundservices/airports/" ~ icao ,0);
@@ -596,6 +604,9 @@ var reinit = func {
             var debugcmd = debugcmdNode.getValue();
             execDebugcmd(debugcmd);            
         });    
+	} else {
+	    # switch off debug log level in production
+	    logger.loglevel = LOGLEVEL_INFO;
 	}
 	#init is done in wakeup through update()
                 

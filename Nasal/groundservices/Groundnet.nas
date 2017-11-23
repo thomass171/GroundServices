@@ -23,46 +23,53 @@ var Groundnet = {
         obj.maxaltitude = -10000;
 		#logging.debug("groundnetNode "~groundnetNode.getName());
 		
-        var nodelist = groundnetNode.getChild("TaxiNodes",0).getChildren("node");
-        for (i = 0; i < size(nodelist); i=i+1) {
-            var node = nodelist[i];
-            #logging.debug("node "~i~node.getName());
-            var n = obj.addNode(obj.groundnetgraph, projection, node);
-            obj.registerAltitude(n);
-        }
-        nodelist = groundnetNode.getChild("parkingList",0).getChildren("Parking");
-        for (i = 0; i < size(nodelist); i=i+1) {
-            var node = nodelist[i];
-            #logging.debug("node "~i~node.getName());
-            var n = obj.addNode(obj.groundnetgraph, projection, node);
-            obj.registerAltitude(n);
-            var parkingname = getXmlAttrStringValue(node, "name");
-            #n.customdata = { type:"P", name: parkingname, node : n};
-            n.customdata = Parking.new(n, parkingname, getXmlFloatAttribute(node, "heading", 0), getXmlFloatAttribute(node, "pushBackRoute", -1), getXmlFloatAttribute(node, "radius", 0));
-            if (homename != nil and homename == parkingname){
-                obj.home = n.customdata;                
+        var nodelist = nil;
+        if (groundnetNode.getChild("TaxiNodes",0) != nil) {
+            nodelist = groundnetNode.getChild("TaxiNodes",0).getChildren("node");
+            for (i = 0; i < size(nodelist); i=i+1) {
+                var node = nodelist[i];
+                #logging.debug("node "~i~node.getName());
+                var n = obj.addNode(obj.groundnetgraph, projection, node);
+                obj.registerAltitude(n);
             }
         }
-        nodelist = groundnetNode.getChild("TaxiWaySegments",0).getChildren("arc");
-        for (i = 0; i < size(nodelist); i=i+1) {
-            var node = nodelist[i];
-            var begin =  getXmlAttrStringValue(node, "begin");
-            var end =  getXmlAttrStringValue(node, "end");
-            var name = getXmlAttrStringValue(node, "name");
-            var bn = obj.groundnetgraph.findNodeByName(begin);
-            var en = obj.groundnetgraph.findNodeByName(end);
-            if (bn == nil) {
-                logging.warn("begin node not found: " ~ begin);
-            } else {
-                if (en == nil) {
-                    logging.warn("end node not found: " ~ end);
+        if (groundnetNode.getChild("parkingList",0) != nil) {
+            nodelist = groundnetNode.getChild("parkingList",0).getChildren("Parking");
+            for (i = 0; i < size(nodelist); i=i+1) {
+                var node = nodelist[i];
+                #logging.debug("node "~i~node.getName());
+                var n = obj.addNode(obj.groundnetgraph, projection, node);
+                obj.registerAltitude(n);
+                var parkingname = getXmlAttrStringValue(node, "name");
+                #n.customdata = { type:"P", name: parkingname, node : n};
+                n.customdata = Parking.new(n, parkingname, getXmlFloatAttribute(node, "heading", 0), getXmlFloatAttribute(node, "pushBackRoute", -1), getXmlFloatAttribute(node, "radius", 0));
+                if (homename != nil and homename == parkingname){
+                    obj.home = n.customdata;                
+                }
+            }
+        }
+        if (groundnetNode.getChild("TaxiWaySegments",0) != nil) {
+            nodelist = groundnetNode.getChild("TaxiWaySegments",0).getChildren("arc");
+            for (i = 0; i < size(nodelist); i=i+1) {
+                var node = nodelist[i];
+                var begin =  getXmlAttrStringValue(node, "begin");
+                var end =  getXmlAttrStringValue(node, "end");
+                var name = getXmlAttrStringValue(node, "name");
+                var bn = obj.groundnetgraph.findNodeByName(begin);
+                var en = obj.groundnetgraph.findNodeByName(end);
+                if (bn == nil) {
+                    logging.warn("begin node not found: " ~ begin);
                 } else {
-                    var c = obj.groundnetgraph.findConnection(bn, en);
-                    if (c == nil) {
-                        var longname = "" ~ begin ~ "->" ~ end ~ "(" ~ name ~ ")";
-                        var shortname = "" ~ begin ~ "-" ~ end;
-                        c = obj.groundnetgraph.connectNodes(bn, en, shortname);
-                        #TODO c.customdata = TaxiwaySegment.new(c, name, XmlHelper.getBooleanAttribute(node, "isPushBackRoute", false));
+                    if (en == nil) {
+                        logging.warn("end node not found: " ~ end);
+                    } else {
+                        var c = obj.groundnetgraph.findConnection(bn, en);
+                        if (c == nil) {
+                            var longname = "" ~ begin ~ "->" ~ end ~ "(" ~ name ~ ")";
+                            var shortname = "" ~ begin ~ "-" ~ end;
+                            c = obj.groundnetgraph.connectNodes(bn, en, shortname);
+                            #TODO c.customdata = TaxiwaySegment.new(c, name, XmlHelper.getBooleanAttribute(node, "isPushBackRoute", false));
+                        }
                     }
                 }
             }

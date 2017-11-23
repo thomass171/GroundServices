@@ -2,11 +2,17 @@
 #
 #
 
+var LOGLEVEL_ERROR = 200;
+var LOGLEVEL_WARN = 300;
+var LOGLEVEL_INFO = 400;
+var LOGLEVEL_DEBUG = 500;
+
 var logger = {    
 	new: func() {	    
 	    var obj = { parents: [logger] };
 	    obj.logfilecreated = 0;
 	    obj.logfilename = "groundservices.log";
+	    obj.loglevel = LOGLEVEL_DEBUG;
 	    return obj;
 	},	    
     
@@ -28,19 +34,27 @@ var logger = {
     },    
     
     debug: func(msg){
-        me.logwrite("DEBUG",msg);
+        if (me.loglevel >= LOGLEVEL_DEBUG) {
+            me.logwrite("DEBUG",msg);
+        }
     },
     
     info: func(msg){
-        me.logwrite("INFO ",msg);
+        if (me.loglevel >= LOGLEVEL_INFO) {
+            me.logwrite("INFO ",msg);
+        }
     },
     
     warn: func(msg){
-        me.logwrite("WARN ",msg);
+        if (me.loglevel >= LOGLEVEL_WARN) {
+            me.logwrite("WARN ",msg);
+        }
     },
     
     error: func(msg){
-        me.logwrite("ERROR", msg);
+        if (me.loglevel >= LOGLEVEL_ERROR) {
+            me.logwrite("ERROR", msg);
+        }
     },          	
 };
 
