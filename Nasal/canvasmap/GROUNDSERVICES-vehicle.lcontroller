@@ -1,6 +1,6 @@
 # derived from TFC layer
 # requires a patch to function aircraftpos.controller:update_quickly() for being updated regularly:
-#  	"GROUNDSERVICES-vehicle","TFC", "FLT",
+#  	"GROUNDSERVICES-vehicle","TFC", "FLT", 
 #
 # Class things:
 var name = 'GROUNDSERVICES-vehicle';
@@ -34,19 +34,18 @@ var del = func() {
 };
 
 var MapElement = {
-	new: func(node, categorie="i", layer=nil) {
-		var id = node.getValue("id");
+	new: func(id, posnode, type, categorie="i", layer=nil) {
 		var m = {
 			# Note: because this inherits from props.Node, Symbol.Controller.equals
 			# will call l.equals(r) -- the one defined below
-			parents: [MapElement, geo.Coord, node], # note we don't implement a full geo.Coord API
+			parents: [MapElement, geo.Coord, posnode], # note we don't implement a full geo.Coord API
 			id: id,
-			node: node,
-			pos: node.getNode("position",1),
-			type: node.getValue("type"),
+			node: posnode,
+			pos: posnode,
+			type: type,
 			categorie: categorie,
 		};
-		#logging.debug("found id "~m.id~" "~m.type);
+		#groundservices.logging.info("new MapElement: id="~m.id~", type="~m.type);
 		return m;
 	},
 	equals: func(other) other.id == me.id,
@@ -64,10 +63,8 @@ var MapElement = {
 };
 
 var searchCmd = func {
-	#logging.debug( "Doing query: "~name);
-
-	if (me.map.getRange() == nil) return;
-
+	#groundservices.logging.debug( "Doing query: "~name);
+	
 	var result = [];
 	var models = 0;
 
@@ -85,17 +82,17 @@ var searchCmd = func {
 			continue;
 		}
 		var categorie = 'i';
-		if (me.map.controller.in_range(lat, lon)) {
-		    #TODO set categorie
-			append(result, MapElement.new(t, categorie, me.layer));
-        }
+		append(result, MapElement.new(t.getValue("id"),t.getNode("position",1),t.getValue("type"), categorie, me.layer));        
 	}
-	# TODO sp id might be equal to vehicle id
-	foreach (var t; groundservices.servicepointsN.getChildren("servicepoint")) {    	
-        append(result, MapElement.new(t, "s", me.layer));
+	# sp id might be equal to vehicle id, so add 100000
+	foreach (var t; groundservices.servicepointsN.getChildren("servicepoint")) {
+        #groundservices.logging.info("map servicepoint " ~ t.getValue("id"));
+        append(result, MapElement.new(t.getValue("id")+100000, t.getNode("position",1),"-", "s", me.layer));
     }
-
-	#logging.debug("Found "~size(result)~" VehicleModel's in range out of "~models~" total.");
+	# main aircraft
+    append(result, MapElement.new(-200, props.globals.getNode("position",1),"-", "a"));
+	
+	#groundservices.logging.debug("Found "~size(result)~" VehicleModel's in range out of "~models~" total.");
 	return result;
 };
 

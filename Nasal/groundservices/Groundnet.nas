@@ -21,6 +21,8 @@ var Groundnet = {
 		obj.projection = projection;
 		obj.minaltitude = 10000;
         obj.maxaltitude = -10000;
+        obj.altneedsupdate = 0;
+        obj.parkingnodes = [];
 		#logging.debug("groundnetNode "~groundnetNode.getName());
 		
         var nodelist = nil;
@@ -46,6 +48,7 @@ var Groundnet = {
                 if (homename != nil and homename == parkingname){
                     obj.home = n.customdata;                
                 }
+                append(obj.parkingnodes,n);
             }
         }
         if (groundnetNode.getChild("TaxiWaySegments",0) != nil) {
@@ -96,6 +99,9 @@ var Groundnet = {
                 obj.home = someparkingposwithoneedge;
             }
         }
+        if (obj.altneedsupdate) {
+            logging.info("Some nodes need altitude update");
+        }
         
         logging.info("groundnet home is " ~ ((obj.home == nil)?" unset":obj.home.name));
         
@@ -112,6 +118,25 @@ var Groundnet = {
         }
 	},
 	
+	updateAltitudes: func() {
+	    me.altneedsupdate = 0;	
+	    for (i = 0; i < me.groundnetgraph.getNodeCount(); i=i+1) {
+            n = me.groundnetgraph.getNode(i);
+            if (n.altneedsupdate) {
+                logging.debug("try fixing altitude of node");	             
+                var altinfo = getElevationForLocation(n.coord);
+                if (!altinfo.needsupdate) {
+                    logging.debug("fixing altitude of node to" ~ altinfo.alt);	             
+                    n.locationXYZ.z = altinfo.alt;
+                    n.altneedsupdate = 0;
+                    me.registerAltitude(n);
+                }else {
+                    me.altneedsupdate = 1;
+                }
+            }
+     	}    
+    },
+	
     addNode: func(groundnetgraph, projection, node) {
 	    var name = getXmlAttrStringValue(node,"index");
         var latDeg = parseDegree(getXmlAttrStringValue(node,"lat"));
@@ -124,6 +149,8 @@ var Groundnet = {
         # Elevation will be stored in z-Coordinate            
         var node = groundnetgraph.addNode(name, Vector3.new(xy.x,xy.y,alt));
         node.coord = geo.Coord.new().set_latlon(latDeg,lonDeg);
+        node.altneedsupdate = altinfo.needsupdate;
+        me.altneedsupdate = altinfo.needsupdate;
         return node;
 	},
 
@@ -136,6 +163,8 @@ var Groundnet = {
         locXYZ.z = alt;
         var node = me.groundnetgraph.addNode(name, locXYZ);
         node.coord = coord;
+        node.altneedsupdate = altinfo.needsupdate;
+        me.altneedsupdate = altinfo.needsupdate;
         return node;
     },
     
@@ -220,7 +249,7 @@ var Groundnet = {
                 var intersectionXY = getLineIntersection(headinglinestartXY, headinglineendXY, linestartXY, lineendXY);
                 if (intersectionXY != nil and isPointOnLine(linestartXY, lineendXY, intersectionXY)) {
                     var distance = getDistanceXYZ(positionXYZ, Vector3.new(intersectionXY.getX(), intersectionXY.getY(), 0));
-                    #logger.debug("intersection=" + intersection + " with " + e.getName() + ", distance=" + distance);
+                    #logging.debug("intersection=" + intersection + " with " + e.getName() + ", distance=" + distance);
                     var angle = getAngleBetween(Vector3.new(intersectionXY.getX(), intersectionXY.getY(), 0).subtract(positionXYZ), buildFromVector2(getDirectionFromHeading(heading)));
                     if (angle < PI_2) {
                         if (!empty(e.getName()) and distance < bestdistance) {

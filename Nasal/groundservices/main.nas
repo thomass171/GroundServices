@@ -33,6 +33,7 @@ var refmarkermodel = nil;
 var projection = nil;
 var lastcheckforstandby = 0;
 var lastcheckforaircraft = 0;
+var last120 = 0;
 var lastscheduling = 0;
 var checkforaircraftinterval = 15;
 var schedulinginterval = 2;
@@ -55,7 +56,8 @@ var servicepointsN = nil;
 var maprangeNode = nil;
 
 #increased for avoiding vehicles that are blocked due to missing escape path (eg. missing teardrop turn) to waste CPU time
-var maxidletime = 15;
+#increased to 60 for having more vehicles ready for service
+var maxidletime = 60;
 var failedairports = {};
 var minairportrange = 3;
 var homename = nil;
@@ -157,7 +159,8 @@ var createVehicle = func(sim_ai_index, graphposition=nil, delay=0) {
         }
 	}
     gmc = GraphMovingComponent.new(nil,nil,graphposition);	
-	GroundVehicle.new( model, gmc, maximumspeed, type,delay);
+	var vehicle = GroundVehicle.new( model, gmc, maximumspeed, type,delay);
+	return vehicle;
 }
 
 
@@ -214,7 +217,8 @@ var update = func() {
             wakeup();   
             settimer(func update(), 0);
         }else{
-            settimer(func update(), 5);
+            # try again 15 seconds later
+            settimer(func update(), 15);
         }
         return;
     }
@@ -234,8 +238,22 @@ var update = func() {
             shutdown();
             settimer(func update(), 5);
             return;
-        }       
+        }
+        # no relation to left airport; just to have the call at some interval
+        if (groundnet.altneedsupdate) {
+            groundnet.updateAltitudes();      
+        }
+        
     }
+    if (last120 < currenttime - 120) {
+        last120 = currenttime;
+        var stat = "";
+        if (groundnet != nil and groundnet.groundnetgraph != nil) {
+            stat ~= groundnet.groundnetgraph.getStatistic();
+        }
+        logging.info("statistics: "~stat);
+    }
+    
     # check regularly for aircrafts needing service
     if (lastcheckforaircraft < currenttime - checkforaircraftinterval) {
         lastcheckforaircraft = currenttime;
@@ -322,11 +340,7 @@ var update = func() {
     }
     
     if (math.mod(currenttime,60)==0){
-        var stat = "";
-        if (groundnet != nil and groundnet.groundnetgraph != nil) {
-            stat ~= groundnet.groundnetgraph.getStatistic();
-        }
-        logging.info("statistics: "~stat);
+        
             
     }
     settimer(func update(), 0);
@@ -386,11 +400,16 @@ var getNextDestination = func(lastdestination) {
     var destination = nil;
     for (var cnt=0;cnt<10;cnt+=1) {
         if (destinationlist == nil or size(destinationlist) == 0) {
-            # use random destination
-            destination = groundnet.groundnetgraph.getNode(math.mod(randnextInt(), groundnet.groundnetgraph.getNodeCount()));
+            # use random destination. If we hava enough parking nodes (lets say 10) only use these as destination to avoid
+            # vehicles to end up on a runway.
+            if (size(groundnet.parkingnodes) > 10) {
+                destination = groundnet.parkingnodes[math.mod(randnextInt(), size(groundnet.parkingnodes))];
+            } else {
+                destination = groundnet.groundnetgraph.getNode(math.mod(randnextInt(), groundnet.groundnetgraph.getNodeCount()));
+            }
         } else {
             var index = math.mod(randnextInt(), size(destinationlist) + 1);
-            logging.debug("using random destination index " ~ index);
+            logging.debug("using random predefined destination index " ~ index);
             if (index == size(destinationlist)) {
                 destination = groundnet.getVehicleHome().node;
             } else {
@@ -485,24 +504,35 @@ var initProperties = func() {
 #
 # wakeup from state standby. airport and groundnet info is already set.
 var wakeup = func() {
-    var delay = 0;
+    #var delay = 0;
     logging.debug("wakeup: loading initial settings. scalefactor="~scalefactor~",maxservicepoints="~maxservicepoints);
-            
+    
+    #var totalcnt = 0;
+    #foreach (var vehicle_node;simaigroundservicesN.getChildren("vehicle")){
+    #    var sim_ai_index = vehicle_node.getIndex();
+    #    var cnt=vehicle_node.getValue("initialcount") or 0;
+    #    totalcnt += cnt;
+    #}
+
+    var automoveinterval = 20;
+    var offset = maxidletime;          
     foreach (var vehicle_node;simaigroundservicesN.getChildren("vehicle")){
         var sim_ai_index = vehicle_node.getIndex();
         var cnt=vehicle_node.getValue("initialcount") or 0;
         cnt *= scalefactor;
         #if (){
-            delay += 0;
+            #delay += 0;
         #}
         logging.debug("init vehicle " ~ sim_ai_index ~ " with " ~ cnt ~ " instances");
         for (var i=0;i<cnt;i+=1){
-            # initial position will be set to defined home pos                 
-            createVehicle(sim_ai_index,nil,delay);
+            # initial position will be set to defined home pos. delay is no longer used here. Instead the last statechangetimestamp is set to the past         
+            var vehicle = createVehicle(sim_ai_index,nil,0);
             # Only set delay value if autostart is active? No, why. Even for Servicing vehicles should start one after the other
             #if (automoveNode.getValue()){
-                delay += 8;
+                #delay += 8;
             #}
+            vehicle.initStatechangetimestamp(offset);
+            offset -= automoveinterval;
         }
     }
     	            
@@ -583,14 +613,14 @@ var checkWakeup = func() {
             maxservicepoints = maxservicepointsNode.getValue() * scalefactor;         
             return 1;
         }
-        logging.debug("ignoring airport. No elevation info");
+        logging.warn("ignoring airport. No elevation info");
     }
     return 0;
 }
 
 # called after initial load and reload.
 var reinit = func {
-    logging.debug("reinit");
+    logging.info("reinit");
     if (statusNode == nil){
         # first time reinit
         initProperties();
@@ -606,7 +636,7 @@ var reinit = func {
         });    
 	} else {
 	    # switch off debug log level in production
-	    logger.loglevel = LOGLEVEL_INFO;
+	    logging.loglevel = LOGLEVEL_INFO;
 	}
 	#init is done in wakeup through update()
                 

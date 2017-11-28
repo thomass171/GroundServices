@@ -28,17 +28,20 @@ var getXmlFloatAttribute = func(node, attrname, defaultvalue) {
     
 var parseDegree = func(s) {
     #logging.debug("parse "~s);
-    var f = s[0];
-    if (string.isdigit(f))
-        return num(s);
-        
-    var parts = split(" ",s);
-    var minuten = num(parts[1]);
-    var degree = num(substr(parts[0],1));
-    var d = degree+minuten/60;
-    if (f=="W" or f=="S"){
-        d = -d;
+    var d = 0;
+    if (string.isdigit(s[0])) {
+        d = num(s);        
+    } else {
+        var f = substr(s,0,1);                    
+        var parts = split(" ",s);
+        var minuten = num(parts[1]);
+        var degree = num(substr(parts[0],1));
+        var d = degree+minuten/60;
+        if (f=="W" or f=="S"){
+            d = -d;
+        }
     }
+    #logging.debug("parsed "~d ~ "f="~f);            
     return d;
 };
 
@@ -325,15 +328,17 @@ var validateAltitude = func(alt) {
     return 0;
 }
 
-var fixAltitude = func(locationXYZ) {
+var fixAltitude = func(node) {
     if (groundnet == nil){
         #during testing?
         return;
     }
-    var coord = groundnet.projection.unproject(locationXYZ);    
+    var coord = groundnet.projection.unproject(node.locationXYZ);    
     var altinfo = getElevationForLocation(coord);
     var alt = altinfo.alt;  
-    locationXYZ.z = alt;
+    node.locationXYZ.z = alt;
+    node.coord = coord;
+    node.altneedsupdate = altinfo.needsupdate;
 }
 
 logging.debug("completed util.nas");

@@ -25,6 +25,9 @@ then
     error "not in base directory"
 fi
 
+echo "Building package from HEAD. Be sure to commit last changes. Hit <CR>"
+read
+
 rm -f $DESTFILE.zip
 
 # zip from above for including "GroundServices" path

@@ -7,9 +7,9 @@ var LOGLEVEL_WARN = 300;
 var LOGLEVEL_INFO = 400;
 var LOGLEVEL_DEBUG = 500;
 
-var logger = {    
+var Logger = {    
 	new: func() {	    
-	    var obj = { parents: [logger] };
+	    var obj = { parents: [Logger] };
 	    obj.logfilecreated = 0;
 	    obj.logfilename = "groundservices.log";
 	    obj.loglevel = LOGLEVEL_DEBUG;
@@ -17,10 +17,10 @@ var logger = {
 	},	    
     
     logwrite: func (level,msg){
-        var currenttime = systime();
-        var seconds = math.mod(math.round(currenttime ), 60);
-        var minute = math.mod(math.round(currenttime / (60)), 60);
-        var hour = math.mod(math.round(currenttime / (60*60)), 24);
+        var currenttime = math.round(systime());
+        var seconds = math.mod(currenttime, 60);
+        var minute = math.mod(math.floor(currenttime / 60), 60);
+        var hour = math.mod(math.floor(currenttime / 3600), 24);
         var filename = props.getNode("/sim/fg-home").getValue() ~ "/" ~ me.logfilename;
         var logfp = nil;
         if (!me.logfilecreated) {
@@ -58,4 +58,4 @@ var logger = {
     },          	
 };
 
-var logging = logger.new();
+var logging = Logger.new();

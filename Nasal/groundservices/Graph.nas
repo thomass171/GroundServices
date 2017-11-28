@@ -440,6 +440,7 @@ var GraphNode = {
 		obj.name = name;
 		obj.locationXYZ = locationXYZ;
 		obj.edges = [];
+		obj.altneedsupdate = 1;
 		append(nodes,obj);
 		return obj;
 	},

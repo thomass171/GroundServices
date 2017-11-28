@@ -35,9 +35,7 @@ var GroundVehicle = {
 
         m.aiid = baseid;
         baseid = baseid +1;
-        m.vhc = VehicleComponent.new(type,m.aiid);
-        m.vc = VelocityComponent.new();
-
+        
         m.ai.getNode("id", 1).setIntValue(m.aiid);
 		m.ai.getNode("vehicle", 1).setBoolValue(1);
 		m.ai.getNode("valid", 1).setBoolValue(1);
@@ -47,9 +45,13 @@ var GroundVehicle = {
 		m.lonN = m.ai.getNode("position/longitude-deg", 1);
 		m.altN = m.ai.getNode("position/altitude-ft", 1);
 		m.hdgN = m.ai.getNode("orientation/true-heading-deg", 1);
-		m.maximumspeedN = m.ai.getNode("maximumspeed", 1);		
-        m.maximumspeedN.setValue(maximumspeed);
-        
+		var maximumspeedN = m.ai.getNode("maximumspeed", 1);		
+        maximumspeedN.setValue(maximumspeed);
+        var speedN = m.ai.getNode("velocities/speed-ms", 1);
+
+        m.vhc = VehicleComponent.new(type,m.aiid);
+        m.vc = VelocityComponent.new(maximumspeedN, speedN);
+
 		#m.update();
 		
 		# link nodes from current "/ai/models/gsvehicle" to corresponding "/models/model[]" entry                
@@ -87,8 +89,9 @@ var GroundVehicle = {
 	        #logging.debug("update");
 	    }
 	    
-	    if (currenttime > me.vhc.createtimestamp + me.delay) {
+	    if (currenttime > me.gmc.statechangetimestamp + me.delay) {
 		    me.moveForward(deltatime);
+		    me.delay = 0;
 		}		       
 	},
 	
@@ -107,7 +110,7 @@ var GroundVehicle = {
         
         if (gmc.automove) {
             me.adjustSpeed(gmc, vc, tpf);
-            #var speed = me.maximumspeedN.getValue();
+            vc.speedN.setValue(vc.movementSpeed);
             var completedpath = gmc.moveForward(tpf * vc.movementSpeed);
             me.adjustVisual(gmc);
             if (completedpath != nil) {
@@ -198,6 +201,10 @@ var GroundVehicle = {
 		logging.info(msg);
 	},
 	
+	initStatechangetimestamp: func(offset) {
+	    me.vhc.statechangetimestamp = systime() - offset;
+	    me.gmc.statechangetimestamp = systime() - offset;
+	},
 	
 	active: {},
 };
@@ -410,13 +417,14 @@ var VehicleComponent = {
 
 var VelocityComponent = {
     
-    new: func() {	    
+    new: func(maximumspeedN, speedN) {	    
 	    var obj = { parents: [VelocityComponent] };
 	    # unit is m/s 
         obj.movementSpeed = 0.0;
-        obj.maximumSpeed = 10.0;
         obj.acceleration = 1.0;
         obj.deceleration = 2.5;
+        obj.maximumspeedN = maximumspeedN;
+        obj.speedN = speedN;
 		return obj;
 	},
 	
@@ -433,7 +441,7 @@ var VelocityComponent = {
     },
 
     setMaximumSpeed: func(maximumSpeed) {
-        me.maximumSpeed = maximumSpeed;
+        me.maximumspeedN.setValue(maximumSpeed);
     },
 
     setAcceleration: func(acceleration) {
@@ -447,7 +455,7 @@ var VelocityComponent = {
             # no absolute stop, otherwise destination will not be reached
             var diff = me.deceleration * deltatime;
             me.movementSpeed += diff;
-            #logger.debug("accelerate:diff=" + diff + ",movementSpeed=" + movementSpeed + ",acceleration=" + acceleration);
+            #logging.debug("accelerate:diff=" + diff + ",movementSpeed=" + movementSpeed + ",acceleration=" + acceleration);
             if (me.movementSpeed < 1) {
                 me.movementSpeed = 1;
             }
@@ -458,7 +466,7 @@ var VelocityComponent = {
     },    
 
     getMaximumSpeed: func() {
-        return me.maximumSpeed;
+        return me.maximumspeedN.getValue();
     },
     
     getBrakingDistance: func() {

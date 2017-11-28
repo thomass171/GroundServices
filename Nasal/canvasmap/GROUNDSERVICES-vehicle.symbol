@@ -15,6 +15,7 @@ var element_type = "group"; # we want a group, becomes "me.element"
 var icon = nil;
 var iconsize = 3;
 var color = [0,0,1];
+var coloraircraft = [0.2,0.8,0.9];
 var colorIdle = [0,1,0];
 var colorMoving = [0,1,0.5];
 var colorBusy = [1,0.5,0];
@@ -36,6 +37,8 @@ var draw = func {
         c = [1,0.7,1];
     } else if (categorie == 's') {
         c = [1,0,1];
+    } else if (categorie == 'a') {
+        c = coloraircraft;
     }
     if (me.icon == nil) {
 	    #logging.debug("drawing icon");

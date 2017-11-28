@@ -156,6 +156,8 @@ var miscTest = func() {
     assertFloat("C_7 lat",50.878298,deg);        
     deg = parseDegree("E7 7.458788");
     assertFloat("C_7 lon",7.124313,deg);
+    deg = parseDegree("W00 27.303");
+    assertFloat("W",-0.45505,deg);
     logging.debug("finished miscTest");
 };
 

@@ -44,7 +44,7 @@ var extendWithEdge = func(graph, edge, len, layer) {
     var dir = edge.getDirection();
     var destination = toloc.add(dir.normalize().multiply(len));
     var destnode = graph.addNode("", destination);
-    fixAltitude(destnode.locationXYZ);        
+    fixAltitude(destnode);        
     var e = graph.connectNodes(edge.to, destnode, "", layer);
     return e;
 };
@@ -117,6 +117,7 @@ addArcToAngle = func( graph, start, e1, mid, e2, end, para, layer) {
     var arcbegin = nil;
     if (getDistanceXYZ(para.arcbeginloc, start.getLocation()) > mindistancefornewnode) {
         arcbegin = graph.addNode("smoothbegin", para.arcbeginloc);
+        fixAltitude(arcbegin);
         graph.connectNodes(start, arcbegin, "smoothbegin", layer);
     } else {
         arcbegin = start;
@@ -124,6 +125,7 @@ addArcToAngle = func( graph, start, e1, mid, e2, end, para, layer) {
     var arcend = nil;
     if (e2len - para.distancefromintersection > mindistancefornewnode) {
         arcend = graph.addNode("smoothend", mid.add(para.v2));
+        fixAltitude(arcend);
         graph.connectNodes(arcend, end, "smoothend", layer);
     } else {
         arcend = end;
@@ -152,7 +154,7 @@ var createBranch = func( graph,  node,  edge,  branchlen,  angle,  layer) {
 var extend = func( graph,  node,  dir ,  len,  layer) {
     dir = dir.multiply(len);
     var destination = graph.addNode("ex", node.getLocation().add(dir));
-    fixAltitude(destination.locationXYZ);
+    fixAltitude(destination);
     var branch = graph.connectNodes(node, destination, "", layer);
     return branch;
 }

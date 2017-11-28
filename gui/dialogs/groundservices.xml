@@ -36,20 +36,20 @@
             if (select_vehicle_node != nil){
             sai = select_vehicle_node.getIndex();
             }
-            #groundservices.logger.debug("gui:generate_groundservice "~ sai);
+            #groundservices.logging.debug("gui:generate_groundservice "~ sai);
             if (sai != -1){
             groundservices.createVehicle(sai);
             }
             }
 
             var generate_move = func(parkpos) {
-            #groundservices.logger.debug("gui:generate_move " ~ parkpos);
+            #groundservices.logging.debug("gui:generate_move " ~ parkpos);
             groundservice.requestMove(1,parkpos);
             }
 
             # fill combo box of arrived aircraft
             var k = keys(groundservices.arrivedaircraft);
-            #groundservices.logger.debug("gui:aircrafts: " ~ size(k));
+            #groundservices.logging.debug("gui:aircrafts: " ~ size(k));
 
             if (size(k) > 0) {
             var combo = gui.findElementByName(dlgRoot, "aircraft-combo");

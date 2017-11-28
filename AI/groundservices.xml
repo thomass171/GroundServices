@@ -24,8 +24,9 @@
         <type>pushback</type>
         <model>Models/GroundServices/Goldhofert/Goldhofert.xml</model>
         <initialcount>3</initialcount>
-        <maximumspeed>4.1</maximumspeed>
-        <acceleration>1.1</acceleration>
+        <!-- 42 kmh-->
+        <maximumspeed>11.7</maximumspeed>
+        <acceleration>0.9</acceleration>
     </vehicle>
 
     <vehicle>
@@ -33,7 +34,8 @@
         <type>followme</type>
         <model>Models/GroundServices/Followme/followme.xml</model>
         <initialcount>3</initialcount>
-        <maximumspeed>7.1</maximumspeed>
+        <!-- 77 kmh-->
+        <maximumspeed>21.3</maximumspeed>
         <acceleration>4.5</acceleration>
     </vehicle>
 
@@ -42,7 +44,8 @@
         <type>fueltruck</type>
         <model>Models/GroundServices/FuelTruck/Fuel_Truck_Short_VolvoFM.xml</model>
         <initialcount>5</initialcount>
-        <maximumspeed>6.1</maximumspeed>
+        <!-- 56 kmh-->
+        <maximumspeed>15.5</maximumspeed>
         <acceleration>1.3</acceleration>
     </vehicle>
 
@@ -51,7 +54,8 @@
         <type>catering</type>
         <model>Models/GroundServices/Catering/catruckmed-lsg1.xml</model>
         <initialcount>5</initialcount>
-        <maximumspeed>6.1</maximumspeed>
+        <!-- 63 kmh-->
+        <maximumspeed>17.5</maximumspeed>
         <acceleration>1.5</acceleration>
     </vehicle>
 

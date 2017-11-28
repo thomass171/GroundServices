@@ -231,36 +231,40 @@ var VehicleOrderAction = {
 	
 	# A currently moving vehicle cannot be relocted for now because it most likely runs on a temporary unknown layer (-> "no path found");
     dotrigger: func() {
-       me.schedule.vehicle = findAvailableVehicle(me.vehicletype);
-       if (me.schedule.vehicle == nil) {
-           logging.warn("VehicleOrderAction: no available vehicle found for type "~me.vehicletype);
-           return;
-       }
+        me.schedule.vehicle = findAvailableVehicle(me.vehicletype);
+        if (me.schedule.vehicle == nil) {
+            logging.warn("VehicleOrderAction: no available vehicle found for type "~me.vehicletype);
+            return;
+        }
 
-       me.setState(1);
-       var vhc = me.schedule.vehicle.vhc;
-       var gmc = me.schedule.vehicle.gmc;
+        me.setState(1);
+        var vhc = me.schedule.vehicle.vhc;
+        var gmc = me.schedule.vehicle.gmc;
        
-       var groundnet = me.schedule.groundnet;
-       var start = gmc.currentposition;
-       var approach = nil;
-       if (me.schedule.servicepoint == nil){
-           approach = groundnet.createPathFromGraphPosition( start,me.destination);
-       } else{
-           approach = me.schedule.servicepoint.getApproach(start, me.destination,1);
-       }
+        var groundnet = me.schedule.groundnet;
+        var start = gmc.currentposition;
+        var approach = nil;
+        if (me.schedule.servicepoint == nil){
+            approach = groundnet.createPathFromGraphPosition( start,me.destination);
+        } else{
+            approach = me.schedule.servicepoint.getApproach(start, me.destination,1);
+        }
 
-       if (approach != nil) {
+        if (approach != nil) {
            #
-       } else {
-           logging.error("no approach found to " ~ me.destination.toString());
-           #set to failed.
-           me.state=3;
-           return;
-       }
-       vhc.schedule = me.schedule;
-       logging.debug("set approachpath:" ~ approach.toString());
-       gmc.setPath(approach);
+        } else {
+            logging.error("no approach found to " ~ me.destination.toString());
+            #set to failed.
+            me.state=3;
+            return;
+        }
+        vhc.schedule = me.schedule;
+        logging.debug("set approachpath:" ~ approach.toString());
+        gmc.setPath(approach);
+        if (me.vehicletype == "fueltruck") {
+            # avoid driving catering and fueltruck alongside by a 6 second delay
+            me.schedule.vehicle.delay = 6;
+        }
     },
 
     # only called for states 0 and 1.

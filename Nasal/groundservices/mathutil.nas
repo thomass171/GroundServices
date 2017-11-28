@@ -164,7 +164,7 @@ var buildRotationZ = func(angdeg) {
 var getLineIntersection = func( p1,  p2,  p3,  p4) {
     var nenner = (((p4.y - p3.y) * (p2.x - p1.x)) - ((p2.y - p1.y) * (p4.x - p3.x)));
     if (math.abs(nenner) < FLT_EPSILON) {
-        return nill;
+        return nil;
     }
     var xs = (((p4.x - p3.x) * ((p2.x * p1.y) - (p1.x * p2.y))) - ((p2.x - p1.x) * ((p4.x * p3.y) - (p3.x * p4.y)))) / nenner;
     var ys = (((p1.y - p2.y) * (p4.x * p3.y - p3.x * p4.y)) - ((p3.y - p4.y) * (p2.x * p1.y - p1.x * p2.y))) / nenner;
