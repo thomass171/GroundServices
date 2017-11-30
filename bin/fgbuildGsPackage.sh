@@ -3,7 +3,7 @@
 # Build release package. Now builds package from git.
 # 
 #
-RELEASE=0.3.0a
+RELEASE=0.3.0
 #`date "+%Y%m%d%H%M"`
 DESTFILE=GroundServices-$RELEASE
 
