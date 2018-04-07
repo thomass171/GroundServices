@@ -3,7 +3,7 @@
 # Build release package. Now builds package from git.
 #
 #
-RELEASE=0.3.0
+RELEASE=0.4.0
 #`date "+%Y%m%d%H%M"`
 DESTFILE=GroundServices-$RELEASE
 
@@ -29,19 +29,6 @@ echo "Building package from HEAD. Be sure to commit last changes. Hit <CR>"
 read
 
 rm -f $DESTFILE.zip
-
-# zip from above for including "GroundServices" path
-# use git
-#cd ..
-#zip -q -r GroundServices/$DESTFILE.zip GroundServices/gui/dialogs/groundservices.xml \
-#    GroundServices/Nasal/canvasmap Nasal/groundservices/G* \
-#    GroundServices/Nasal/groundservices/main.nas \
-#    GroundServices/Nasal/groundservices/mathutil.nas \
-#    GroundServices/Nasal/groundservices/util.nas \
-#    GroundServices/Nasal/groundservices/logger.nas \
-#    GroundServices/AI/groundservices.xml \
-#    GroundServices/Models/GroundServices -x *.DS_Store*
-#checkrc $?
 
 #cd GroundServices
 git archive HEAD --prefix=GroundServices/ --format=zip -o $DESTFILE.zip
