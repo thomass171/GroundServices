@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<PropertyList>
+  <meta>
+    <file-type type="string">FlightGear add-on metadata</file-type>
+    <format-version type="int">1</format-version>
+  </meta>
+
+  <addon>
+    <identifier type="string">com.github.thomass171.GroundServices</identifier>
+    <name type="string">GroundServices</name>
+    <version type="string">0.4.0</version>
+
+    <authors>
+      <author>
+        <name type="string">ThomasS</name>
+        <email type="string"></email>
+        <url type="string"></url>
+      </author>
+    </authors>
+
+    <maintainers>
+      <maintainer>
+        <name type="string">ThomasS</name>
+        <url type="string"> </url>
+      </maintainer>
+    </maintainers>
+
+    <short-description type="string">
+      Add on for providing moving ground service vehicles on an airport.
+    </short-description>
+
+    <long-description type="string">
+    This is a proof of concept prototype for a ground service module for the free flight simulatior FlightGear. Unlike some exisiting ground services which are part of various aircraft, it is intended to be generic and not dependant on specific aircrafts (though there will be dependencies from aircraft dimensions). It currently only moves ground vehicles along an airports taxiways without providing any services. It is written completely in Nasal and is derived/inspired from the existing AI subsystem and tanker.nas (except for the way vehicles are moving).
+
+See http://wiki.flightgear.org/Ground_Services
+    </long-description>
+
+    <license>
+      <designation type="string">
+        GNU GPL version 2 or later
+      </designation>
+
+      <url type="string">
+        https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+      </url>
+    </license>
+
+    <min-FG-version type="string">2018.2.0</min-FG-version>
+    <max-FG-version type="string">none</max-FG-version>
+
+    <urls>
+      <home-page type="string">
+        http://wiki.flightgear.org/Ground_Services
+      </home-page>
+
+      <download type="string">
+        https://github.com/thomass171/GroundServices/releases
+      </download>
+
+      <support type="string">
+        https://forum.flightgear.org/viewtopic.php?f=6&amp;t=30735
+      </support>
+
+      <code-repository type="string">
+        https://github.com/thomass171/GroundServices
+      </code-repository>
+    </urls>
+
+    <tags>
+      <tag type="string">ground</tag>
+      <tag type="string">services</tag>
+    </tags>
+  </addon>
+</PropertyList>

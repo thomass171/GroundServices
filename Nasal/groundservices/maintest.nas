@@ -158,6 +158,9 @@ var miscTest = func() {
     assertFloat("C_7 lon",7.124313,deg);
     deg = parseDegree("W00 27.303");
     assertFloat("W",-0.45505,deg);
+    var ils14l = geo.Coord.new().set_latlon(50.852867,7.169064);
+    ils14l.apply_course_distance(137.58+180, 2500);
+    logging.debug("ils14l(course)="~ils14l.lat() ~ "," ~ ils14l.lon());
     logging.debug("finished miscTest");
 };
 

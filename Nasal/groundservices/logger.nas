@@ -8,10 +8,10 @@ var LOGLEVEL_INFO = 400;
 var LOGLEVEL_DEBUG = 500;
 
 var Logger = {    
-	new: func() {	    
+	new: func(logfilename = "groundservices.log") {	    
 	    var obj = { parents: [Logger] };
 	    obj.logfilecreated = 0;
-	    obj.logfilename = "groundservices.log";
+	    obj.logfilename = logfilename;
 	    obj.loglevel = LOGLEVEL_DEBUG;
 	    return obj;
 	},	    
