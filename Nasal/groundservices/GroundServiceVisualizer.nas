@@ -6,6 +6,7 @@ logging.debug("executing GroundServiceVisualizer.nas");
 
 var groundnetmodel = [];
 var visualizer = nil;
+var maplayerinitialized = 0;
 
 var visualizeGroundnet = func() {
     removeGroundnetModel();
@@ -61,6 +62,18 @@ var setMarkerAtLocation = func(locationXYZ,markerindex,segment=-1,heading=0) {
 }
 
 var openMap = func() {
+    if (!maplayerinitialized) {
+        logging.info("adding mapstructure layer");
+        var dir = root ~ "/Nasal/canvasmap";
+        canvas.MapStructure.loadFile(dir~"/GROUNDSERVICES-net.lcontroller", "GROUNDSERVICES-net");
+        canvas.MapStructure.loadFile(dir~"/GROUNDSERVICES-net.symbol", "GROUNDSERVICES-net");
+        canvas.MapStructure.loadFile(dir~"/GROUNDSERVICES-vehicle.lcontroller", "GROUNDSERVICES-vehicle");
+        canvas.MapStructure.loadFile(dir~"/GROUNDSERVICES-vehicle.symbol", "GROUNDSERVICES-vehicle");
+        append(canvas.Map.Controller.get("Aircraft position").update_quickly,"GROUNDSERVICES-vehicle");
+        logging.info("mapstructure layer added");
+        maplayerinitialized = 1;
+    }
+    
     var (width, height) = (512,512);
     var myCanvas = canvas.new({
         "name": "Ground Services",   # The name is optional but allow for easier identification
