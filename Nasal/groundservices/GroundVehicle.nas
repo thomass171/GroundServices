@@ -10,7 +10,7 @@ var graphmovementdebuglog = 1;
 
 
 var GroundVehicle = {
-	new: func(model, gmc, maximumspeed, type, delay) {
+	new: func(model, gmc, maximumspeed, type, delay, zoffset) {
 	    logging.debug("new GroundVehicle. model="~model);
 		#props.globals.getNode("gear/gear[0]/wow", 1).setValue(1);
 		#props.globals.getNode("sim/model/pushback/enabled", 1).setValue(1);
@@ -21,6 +21,7 @@ var GroundVehicle = {
 		m.gmc = gmc;
 		m.delay = delay;
 
+        # create node in "/models" for having the vehicle model updated(repositioned) by core FG.
 		var n = props.globals.getNode("models", 1);
 		for (var i = 0; 1; i += 1)
 			if (n.getChild("model", i, 0) == nil)
@@ -40,23 +41,32 @@ var GroundVehicle = {
 		m.ai.getNode("vehicle", 1).setBoolValue(1);
 		m.ai.getNode("valid", 1).setBoolValue(1);
         m.ai.getNode("type", 1).setValue(type);         		
-
+        m.ai.getNode("zoffset", 1).setDoubleValue(zoffset);
+        
 		m.latN = m.ai.getNode("position/latitude-deg", 1);
 		m.lonN = m.ai.getNode("position/longitude-deg", 1);
 		m.altN = m.ai.getNode("position/altitude-ft", 1);
 		m.hdgN = m.ai.getNode("orientation/true-heading-deg", 1);
-		var maximumspeedN = m.ai.getNode("maximumspeed", 1);		
+		m.hdgN = m.ai.getNode("orientation/true-heading-deg", 1);
+        m.zoffsetN = m.ai.getNode("zoffset", 1);
+        var maximumspeedN = m.ai.getNode("maximumspeed", 1);		
         maximumspeedN.setValue(maximumspeed);
         var speedN = m.ai.getNode("velocities/speed-ms", 1);
-
+        
         m.vhc = VehicleComponent.new(type,m.aiid);
         m.vc = VelocityComponent.new(maximumspeedN, speedN);
 
 		#m.update();
 		
+		#probe model file in addon. If it exists, use the addon file. Otherwise from FG_ROOT
+		var modelpath = root ~ "/" ~ model;
+        if (!fileExists(modelpath)) {
+             modelpath = fgroot ~ "/" ~ model;        
+        }
+		
 		# link nodes from current "/ai/models/gsvehicle" to corresponding "/models/model[]" entry                
 		
-		m.model.getNode("path", 1).setValue(root~"/"~model);
+		m.model.getNode("path", 1).setValue(modelpath);
 		m.model.getNode("latitude-deg-prop", 1).setValue(m.latN.getPath());
 		m.model.getNode("longitude-deg-prop", 1).setValue(m.lonN.getPath());
 		m.model.getNode("elevation-ft-prop", 1).setValue(m.altN.getPath());
@@ -175,6 +185,8 @@ var GroundVehicle = {
         if (validateAltitude(alt)) {
             logging.warn("updating vehicle to out of range altitude " ~ alt ~ ", fromalt="~fromalt~", toalt="~toalt~",edge="~cp.currentedge.toString());
         }
+        var zoffset = me.zoffsetN.getValue();
+        alt += zoffset;
         me.altN.setDoubleValue(alt * M2FT);
         
     },
@@ -211,13 +223,14 @@ var GroundVehicle = {
 
 var GraphMovingComponent = {
     
-    new: func(dummy1, dummy2, currentposition) {	    
+    new: func(dummy1, dummy2, currentposition,unscheduledmoving=1) {	    
 	    var obj = { parents: [GraphMovingComponent] };
 		obj.currentposition = currentposition;
 		obj.automove = 0;
 		obj.path = nil;
 		obj.selector = nil;
 		obj.statechangetimestamp = 0;
+		obj.unscheduledmoving = unscheduledmoving;
 		return obj;
 	},
 	

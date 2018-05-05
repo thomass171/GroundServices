@@ -13,8 +13,7 @@ var showTestMessage = func(msg) {
 
 #root path of addon
 var root = nil;
-var modulename = "main";
-
+var fgroot = nil;
 
 var oclock = func(bearing) int(0.5 + geo.normdeg(bearing) / 30) or 12;
 var airportelevation = 0;
@@ -137,29 +136,48 @@ var getCurrentAirportIcao = func() {
 #
 # Create an additional ground vehicle based on a given /sim/ai/groundservices/vehicle property node.
 # has index parameter to be callable by dialogs.
+# When no position is supplied, the vehicle is located at the groundnets home position (except aircrafts), which might be defined in groundservices.xml.
 #
 var createVehicle = func(sim_ai_index, graphposition=nil, delay=0) {
-    logging.debug(modulename~".createVehicle with delay " ~ delay);
+    logging.debug("createVehicle "~sim_ai_index~ " with delay " ~ delay);
     course=0;
     vehicle_node = props.globals.getNode("/sim/ai/groundservices",1).getChild("vehicle", sim_ai_index, 1);
 	var model = vehicle_node.getNode("model", 1).getValue();		
 	var type  = vehicle_node.getNode("type", 1).getValue();
 	var maximumspeed = vehicle_node.getNode("maximumspeed",1).getValue() or 5;
-		
+	# zoffset 0 will be used when no tag exists.
+	var zoffset = vehicle_node.getNode("zoffset",1).getValue() or 0;
+    var unscheduledmoving = vehicle_node.getNode("unscheduledmoving",1).getValue();
+    if (unscheduledmoving == nil) {
+        unscheduledmoving = 1;
+    }
+	
 	var gmc = nil;
     if (graphposition == nil){
 	    logging.debug("no position. using home ");
 	    var home = groundnet.getVehicleHome();
-	    if (home != nil) {
+        if (home != nil) {
             graphposition = groundnet.getParkingPosition(home);            
-	    } 
+        }
+	    if (type == "aircraft") {
+	        # position aircraft to the southwest most park position (just arbitrary).
+	        var southwest = cloneCoord(center).apply_course_distance(225, 25000);
+	        var parking = groundnet.getParkPosNearCoordinates(southwest);
+	        if (parking != nil) {
+	            logging.debug("new aircraft at parking "~parking.toString());
+	            var newgraphposition = groundnet.getParkingPosition(parking);
+	            if (newgraphposition != nil){
+	                graphposition=newgraphposition;
+	            }
+	        }
+	    }
 	    if (graphposition == nil) {
             logging.warn("still no position. No vehicle created.");
             return;
         }
 	}
-    gmc = GraphMovingComponent.new(nil,nil,graphposition);	
-	var vehicle = GroundVehicle.new( model, gmc, maximumspeed, type,delay);
+    gmc = GraphMovingComponent.new(nil,nil,graphposition,unscheduledmoving);	
+	var vehicle = GroundVehicle.new( model, gmc, maximumspeed, type,delay, zoffset );
 	return vehicle;
 }
 
@@ -168,6 +186,7 @@ var requestMove = func(vehicletype, parkposname) {
     foreach (var v; values(GroundVehicle.active)){
         if (v.type == vehicletype) {
             logging.debug("requestMove for "~v.aiid);
+            #24.4.18: Broken? TODO
             var destinationnode =
             var path = groundnet.groundnetgraph.findPath(v.gmc.currentposition, destinationnode, nil);
             #if (visualizer != nil) {
@@ -331,7 +350,7 @@ var update = func() {
 
         if (automoveNode.getValue()) {                    
             #spawn moving for idle vehicles to random destination
-            if (expiredIdle(gmc,vhc,maxidletime) and !vhc.isScheduled()) {             
+            if (gmc.unscheduledmoving and expiredIdle(gmc,vhc,maxidletime) and !vhc.isScheduled()) {             
                 vhc.lastdestination = getNextDestination(vhc.lastdestination);
                 logging.debug("Spawning move to " ~ vhc.lastdestination.getName());                
                 spawnMoving(v, vhc.lastdestination);
@@ -627,7 +646,7 @@ var reinit = func {
     }
 	shutdown();
 	var path = getprop("/sim/fg-home") ~ '/runtest';
-    if (io.stat(path) != nil) {
+    if (fileExists(path)) {
         maintest();
         var debugcmdNode = initNode("debugcmd","--", "STRING");	
         setlistener(debugcmdNode, func {
@@ -638,6 +657,7 @@ var reinit = func {
 	    # switch off debug log level in production
 	    logging.loglevel = LOGLEVEL_INFO;
 	}
+	fgroot = getprop("/sim/fg-root");
 	#init is done in wakeup through update()
                 
     update();

@@ -468,7 +468,11 @@ var Parking = {
         }
         logging.warn("no approach edge found for parking " ~ me.name);                            
         return nil;
-    },                	
+    },
+    toString: func() {
+        var s = ""~me.name;
+        return s;
+    }                   	
 };
 
 var loadGroundnet = func(path) {

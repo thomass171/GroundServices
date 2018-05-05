@@ -341,4 +341,17 @@ var fixAltitude = func(node) {
     node.altneedsupdate = altinfo.needsupdate;
 }
 
+var fileExists = func(absfilename) {
+    if (io.stat(absfilename) != nil) {
+        return 1;
+    }
+    return 0;
+}
+
+var cloneCoord = func(coord) {
+    var c = geo.Coord.new().set_latlon(coord.lat(),coord.lon());    
+    c.set_alt(coord.alt());
+    return c;   
+}
+
 logging.debug("completed util.nas");

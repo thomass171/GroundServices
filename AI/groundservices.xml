@@ -59,6 +59,42 @@
         <acceleration>1.5</acceleration>
     </vehicle>
 
+    <!-- Have two aircrafts available that could "arrive" at the currents position neighbor park positions and get servicing.-->
+    <vehicle>
+        <name></name>
+        <type>aircraft</type>
+        <model>AI/Aircraft/737/737-AirCanada.xml</model>
+        <initialcount>1</initialcount>
+        <!-- 42 kmh-->
+        <maximumspeed>11.7</maximumspeed>
+        <acceleration>0.9</acceleration>
+        <!-- some AI models need to be raised(??)-->
+        <zoffset>3</zoffset>
+        <unscheduledmoving>0</unscheduledmoving>
+    </vehicle>
+    <vehicle>
+        <name></name>
+        <type>aircraft</type>
+        <model>AI/Aircraft/737/737-AirFrance.xml</model>
+        <initialcount>1</initialcount>
+        <!-- 42 kmh-->
+        <maximumspeed>11.7</maximumspeed>
+        <acceleration>0.9</acceleration>
+        <!-- some AI models need to be raised(??)-->
+        <zoffset>3</zoffset>
+        <unscheduledmoving>0</unscheduledmoving>
+    </vehicle>
+    <!-- and a business jet just taxiing-->
+    <vehicle>
+        <name></name>
+        <type>aircraft</type>
+        <model>AI/Aircraft/Citation-Bravo/Models/Bravo-ai.xml</model>
+        <initialcount>1</initialcount>
+        <!-- 42 kmh-->
+        <maximumspeed>11.7</maximumspeed>
+        <acceleration>0.9</acceleration>
+    </vehicle>
+    
     <marker>
         <name>Marker</name>
         <model>Aircraft/ufo/Models/marker.ac</model>
