@@ -385,7 +385,8 @@ var expiredIdle = func(gmc,vhc,maxidletime) {
     
 var spawnMoving = func(vehicle, destinationnode) {
     var gmc = vehicle.gmc;
-    var path = groundnet.createPathFromGraphPosition(gmc.currentposition, destinationnode);
+    
+    var path = groundnet.createPathFromGraphPosition(gmc.currentposition, destinationnode, nil, true, -300000, false, vehicle.vhc.config);
     if (path!=nil) {  
         if (visualizer != nil) {
             visualizer.addLayer(groundnet.groundnetgraph,path.layer);

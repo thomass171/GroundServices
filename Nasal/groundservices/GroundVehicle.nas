@@ -418,6 +418,7 @@ var VehicleComponent = {
 	    obj.aiid = aiid;
 	    obj.createtimestamp = systime();
 	    obj.schedule = nil;
+	    obj.config = {type:type};
 		return obj;
 	},
 		    

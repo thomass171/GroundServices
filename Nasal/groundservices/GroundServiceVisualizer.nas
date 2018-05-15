@@ -75,65 +75,38 @@ var openMap = func() {
     }
     
     var (width, height) = (512,512);
-    var myCanvas = canvas.new({
-        "name": "Ground Services",   # The name is optional but allow for easier identification
-        "size": [width, height], # Size of the underlying texture (should be a power of 2, required) [Resolution]
-        "view": [width, height],  # Virtual resolution (Defines the coordinate system of the canvas [Dimensions]
-                        # which will be stretched the size of the texture, required)
-        "mipmapping": 1       # Enable mipmapping (optional)
-    });
-
-    myCanvas.set("background", canvas.style.getColor("bg_color"));
-    # creating the top-level/root group which will contain all other elements/group
-    var root = myCanvas.createGroup();
-
     # "dialog" is a type, not a name
     var window = canvas.Window.new([width,height],"dialog");
-    window.setCanvas(myCanvas);
+    #window.setCanvas(myCanvas);
     window.setTitle("Ground Services");
-    
+    var myCanvas = window.getCanvas(1);
+    var group = window.getCanvas(1).createGroup();
+    myCanvas.set("background", canvas.style.getColor("bg_color"));        
     var myLayout = canvas.VBoxLayout.new();
-    # assign it to the Canvas
-    myCanvas.setLayout(myLayout);
-    var map = root.createChild("map");
+    window.setLayout(myLayout);
        
-    var canvascontroller = 0;
+    var canvascontroller = 1;
     if (canvascontroller) {
-        var button = canvas.gui.widgets.Button.new(root, canvas.style, {})
-            .setText("+")
-            .setCheckable(1) # this indicates that is should be a toggle button
-            .setChecked(0) # depressed by default
-            .setFixedSize(20, 20);
+        var ui_root = window.getCanvas().createGroup();
+        var button_in = canvas.gui.widgets.Button.new(ui_root, canvas.style, {}).setText("-").listen("clicked", func changeZoom(2));
+        var button_out = canvas.gui.widgets.Button.new(ui_root, canvas.style, {}).setText("+").listen("clicked", func changeZoom(0.5));
+        button_in.setSizeHint([32, 32]);
+        button_out.setSizeHint([32, 32]);
         
-        button.listen("toggled", func (e) {
-            if( e.detail.checked ) {
-                logging.debug("depressed");
-                map.setRange(map.getRange()+10);
-            } else {
-                # add code here to react on button not being depressed.
-            }
-        });        
-        myLayout.addItem(button);
-        button = canvas.gui.widgets.Button.new(root, canvas.style, {})
-            .setText("-")
-            .setCheckable(1) # this indicates that is should be a toggle button
-            .setChecked(0) # depressed by default
-            .setFixedSize(20, 20);
-            
-            button.listen("toggled", func (e) {
-                if( e.detail.checked ) {
-                    logging.debug("depressed");
-                    map.setRange(map.getRange()-10);
-                } else {
-                    # add code here to react on button not being depressed.
-                }
-            });        
-        myLayout.addItem(button);
+        var label_zoom = canvas.gui.widgets.Label.new(ui_root, canvas.style, {});
+        var button_box = canvas.HBoxLayout.new();
+        button_box.addItem(button_in);
+        button_box.addItem(label_zoom);
+        button_box.addItem(button_out);
+        button_box.addStretch(1);
+
+        myLayout.addItem(button_box);
+        myLayout.addStretch(1); 
     }
-    
+    var map = group.createChild("map");        
     map.setController("Aircraft position");
     map.setRange(maprangeNode.getValue());      
-    map.setTranslation(myCanvas.get("view[0]")/2, myCanvas.get("view[1]")/2);
+    map.setTranslation(width/2, height/2);
     var r = func(name,vis=1,zindex=nil) return caller(0)[0];
     
     foreach(var type; [r('APT'), r('GROUNDSERVICES-vehicle'), r('GROUNDSERVICES-net') ] ) {
@@ -142,10 +115,12 @@ var openMap = func() {
      
     setlistener(maprangeNode, func {
          logging.debug("main: maprangeNode listener fired");
-         #not used currently initremoteeventhandler();
          map.setRange(maprangeNode.getValue());
+         label_zoom.setText(sprintf("Range %4.2f",maprangeNode.getValue()));
      });
-     
+    
+    changeZoom(1);
+    
     #doesnt work myCanvas.addEventListener("wheel", func(e) {
         #logging.debug("wheel"~e.deltaY);
         #map.setRange(map.getRange()+e.deltaY);
@@ -163,6 +138,12 @@ var openMap = func() {
     #myCanvas.addEventListener("mouseover", func(e) {
     #    logging.debug("mouseover "~e.deltaY);        
     #});            
+};
+
+var changeZoom = func(d)
+{
+   #map.setRange(map.getRange()*d);
+   maprangeNode.setValue(maprangeNode.getValue()*d);
 };
 
 #<view n="230">

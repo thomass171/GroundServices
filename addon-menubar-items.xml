@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<PropertyList>
+    <meta>
+        <file-type type="string">FlightGear add-on menu bar items</file-type>
+        <format-version type="int">1</format-version>
+    </meta>
+
+    <menubar-items>
+
+        <menu>
+            <!-- submenu in 'AI' <label>AI</label>-->
+            <!-- separate main menu 'GS' <label>GS</label>-->
+            <label>GS</label>
+            <enabled type="bool">true</enabled>
+            <item>
+                <name>Main</name>
+                <enabled>true</enabled>
+                <binding>
+                    <command>dialog-show</command>
+                    <dialog-name>groundservices</dialog-name>
+                </binding>
+            </item>
+            <item>
+                <name>Map</name>
+                <enabled>true</enabled>
+                <binding>
+                    <command>nasal</command>
+                    <script>groundservices.openMap();</script>
+                </binding>
+            </item>
+        </menu>
+    </menubar-items>
+</PropertyList>

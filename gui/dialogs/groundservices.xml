@@ -233,6 +233,7 @@
     </group>
     <hrule/>
     
+    <!--
     <group>
         <layout>hbox</layout>
         <default-padding>1</default-padding>
@@ -279,7 +280,7 @@
                 <max>1024</max>
             </binding>
         </button>
-
+-->
         <!--useless view efforts. model+cockpit-view is used instead
         <button>
             <legend>View</legend>
@@ -289,12 +290,14 @@
             </binding>
         </button>-->
 
-        
+<!--        
 
         <empty>
             <stretch>true</stretch>
         </empty>
     </group>
+-->
+    
     <hrule/>
     <group>
         <layout>hbox</layout>
