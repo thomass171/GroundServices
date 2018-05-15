@@ -59,3 +59,4 @@ var Logger = {
 };
 
 var logging = Logger.new();
+var logger = logging;

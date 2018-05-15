@@ -89,6 +89,18 @@ var insertIntoList = func(list, index, element) {
     list[index] = element;
 };
 
+var removeFromList = func(list, index) {
+    var len = size(list);
+    var newlist = [];
+    if (index > 0){
+        newlist = list[0:index-1];
+    }
+    for (var i=index+1;i < len;i+=1) {
+        append(newlist,list[i]);
+    }
+    return newlist;
+};
+
 var buildTearDropTurn = func(e1, e2, turnloop) {
     return { edge: e1, branch : e2, arc : turnloop};                
 };

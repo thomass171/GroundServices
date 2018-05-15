@@ -70,7 +70,8 @@ var scalefactor = 1;
 var maxservicepoints = 1;
 var activetimestamp = 0;
 var collectradius = 500;
-
+var false = 0;
+var true = 1;
 
 var report = func {
     #atc_msg("Ground Service Status: "~statusNode.getValue());
@@ -616,6 +617,7 @@ var checkWakeup = func() {
                 failedairports[icao] = icao;
                 return 0;    
             }
+            groundnet.multilaneenabled = true;
                         
             # read destination list
             destinationlist=[];

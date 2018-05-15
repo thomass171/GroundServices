@@ -129,7 +129,7 @@ var ServicePoint = {
     getDoorReturnPath: func( withsmooth) {
         var graphWeightProvider = me.getDoorReturnPathProvider();
         var returnpath = me.groundnet.createBackPathFromGraphPosition(me.doorEdge.from, me.doorEdge, me.backturn, 
-            me.groundnet.getVehicleHome().node, graphWeightProvider, withsmooth);
+            me.groundnet.getVehicleHome().node, graphWeightProvider, withsmooth, nil);
         return returnpath;
     },
 

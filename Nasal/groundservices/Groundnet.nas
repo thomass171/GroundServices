@@ -12,7 +12,7 @@ var Groundnet = {
     
     new: func(projection, groundnetNode, homename) {	    
 	    var obj = { parents: [Groundnet] };
-		obj.groundnetgraph = Graph.new();
+		obj.groundnetgraph = Graph.new(GraphOrientation.buildForZ0());
 		#string->node
 		obj.parkposname2node = {};
 		obj.home = nil;
@@ -23,6 +23,7 @@ var Groundnet = {
         obj.maxaltitude = -10000;
         obj.altneedsupdate = 0;
         obj.parkingnodes = [];
+        obj.multilaneenabled = false;
 		#logging.debug("groundnetNode "~groundnetNode.getName());
 		
         var nodelist = nil;
@@ -248,9 +249,9 @@ var Groundnet = {
                 var lineendXY = Vector2.new(e.getTo().getLocation().getX(), e.getTo().getLocation().getY());
                 var intersectionXY = getLineIntersection(headinglinestartXY, headinglineendXY, linestartXY, lineendXY);
                 if (intersectionXY != nil and isPointOnLine(linestartXY, lineendXY, intersectionXY)) {
-                    var distance = getDistanceXYZ(positionXYZ, Vector3.new(intersectionXY.getX(), intersectionXY.getY(), 0));
+                    var distance = Vector3.getDistanceXYZ(positionXYZ, Vector3.new(intersectionXY.getX(), intersectionXY.getY(), 0));
                     #logging.debug("intersection=" + intersection + " with " + e.getName() + ", distance=" + distance);
-                    var angle = getAngleBetween(Vector3.new(intersectionXY.getX(), intersectionXY.getY(), 0).subtract(positionXYZ), buildFromVector2(getDirectionFromHeading(heading)));
+                    var angle = Vector3.getAngleBetween(Vector3.new(intersectionXY.getX(), intersectionXY.getY(), 0).subtract(positionXYZ), buildFromVector2(getDirectionFromHeading(heading)));
                     if (angle < PI_2) {
                         if (!empty(e.getName()) and distance < bestdistance) {
                             best = e;
@@ -290,33 +291,43 @@ var Groundnet = {
         }
         var position = nil;        
         if (approach.from == parking.node) {
-            if (getAngleBetween(Vector3.new(dirXY.x, dirXY.y, 0), approach.getEffectiveOutboundDirection(parking.node)) < PI_2) {
+            if (Vector3.getAngleBetween(Vector3.new(dirXY.x, dirXY.y, 0), approach.getEffectiveOutboundDirection(parking.node)) < PI_2) {
                 position = GraphPosition.new(approach);
             } else {
                 #same position but reverse
                 position = GraphPosition.new(approach, approach.getLength(), 1);
             }
         } else {
-            if (getAngleBetween(Vector3.new(dirXY.x, dirXY.y, 0), approach.getEffectiveInboundDirection(parking.node)) < PI_2) {
+            if (Vector3.getAngleBetween(Vector3.new(dirXY.x, dirXY.y, 0), approach.getEffectiveInboundDirection(parking.node)) < PI_2) {
                 position = GraphPosition.new(approach, approach.getLength());
             } else {
                 #same position but reverse
                 position = GraphPosition.new(approach, approach.getLength(), 1);
             }
         }
+        #logger.debug("found position "~position.toString()~ " for parking " ~ parking.name);
         return position;
     },
         
-    createPathFromGraphPosition: func(from, to,  graphWeightProvider = nil, withsmooth = 1, layer = -300000) {
+    createPathFromGraphPosition: func(from, to,  graphWeightProvider = nil, withsmooth = 1, layer = -300000, allowrelocation = 0, vehicleConfig = nil) {
         if (layer == -300000){
             layer = me.newLayer();
         }
-        return createPathFromGraphPosition(me.groundnetgraph, from, to, graphWeightProvider, SMOOTHINGRADIUS, layer, withsmooth, MINIMUMPATHSEGMENTLEN);
+        return createPathFromGraphPosition(me.groundnetgraph, from, to, graphWeightProvider, SMOOTHINGRADIUS, layer, withsmooth, MINIMUMPATHSEGMENTLEN, allowrelocation, me.getLaneInfo(vehicleConfig));
     },
-        
-    createBackPathFromGraphPosition: func(startnode, startedge, backturn, to, graphWeightProvider, withsmooth) {
+    
+    #aircraft still move on the center line
+    getLaneInfo: func(vehicleConfig) {
+        var laneinfo = nil;
+        if (me.multilaneenabled and (vehicleConfig == nil or vehicleConfig.type != VEHICLE_AIRCRAFT)) {
+            laneinfo = {offset : 7};
+        }
+        return laneinfo;
+    },
+            
+    createBackPathFromGraphPosition: func(startnode, startedge, backturn, to, graphWeightProvider, withsmooth, vehicleConfig) {
         var layer = me.newLayer();
-        return createBackPathFromGraphPosition(me.groundnetgraph, startnode, startedge, backturn, to, graphWeightProvider, SMOOTHINGRADIUS, layer, withsmooth, MINIMUMPATHSEGMENTLEN);
+        return createBackPathFromGraphPosition(me.groundnetgraph, backturn, to, graphWeightProvider, SMOOTHINGRADIUS, layer, withsmooth, MINIMUMPATHSEGMENTLEN, false, me.getLaneInfo(vehicleConfig));
     },
             
     newLayer: func() {
@@ -356,8 +367,8 @@ var Groundnet = {
         var best = nil;
         if (o != nil) {
             best =  o[0];
-            var distanceoffrom = getDistanceXYZ(best.from.getLocation(), (prjrearpointXYZ));
-            var distanceofto = getDistanceXYZ(best.to.getLocation(), (prjrearpointXYZ));
+            var distanceoffrom = Vector3.getDistanceXYZ(best.from.getLocation(), (prjrearpointXYZ));
+            var distanceofto = Vector3.getDistanceXYZ(best.to.getLocation(), (prjrearpointXYZ));
             if (distanceoffrom < distanceofto) {
                 branchnode = best.from;
             } else {
@@ -391,8 +402,8 @@ var Groundnet = {
         var bestHitEdge = nil;
         if (o != nil) {
             bestHitEdge = o[0];
-            var distanceoffrom = getDistanceXYZ(bestHitEdge.from.getLocation(), (prjrearpointXYZ));
-            var distanceofto = getDistanceXYZ(bestHitEdge.to.getLocation(), (prjrearpointXYZ));
+            var distanceoffrom = Vector3.getDistanceXYZ(bestHitEdge.from.getLocation(), (prjrearpointXYZ));
+            var distanceofto = Vector3.getDistanceXYZ(bestHitEdge.to.getLocation(), (prjrearpointXYZ));
             if (distanceoffrom < distanceofto) {
                 branchnode = bestHitEdge.from;
             } else {
@@ -454,12 +465,22 @@ var Parking = {
 	
 	# Return edge with correct heading for reaching parkpos in defined parkpos heading.
     # This is not expected to be identical to the pushBackRoute.
-    # Returns null if no such edge exists.
+    # Returns nil if no such edge exists.
     getApproach: func {        
         for (var i = 0; i < me.node.getEdgeCount(); i+=1) {
             var e = me.node.getEdge(i);
             var edgeheading = getTrueHeadingFromDirection(me.node.coord,e.getEffectiveInboundDirection(me.node));
-            logging.debug(""~e.getName()~" :edgeheading="~edgeheading~", parkingheading="~me.heading);
+            #logging.debug(""~e.getName()~" :true edgeheading="~edgeheading~", parkingheading="~me.heading);
+            # large rounding errors might occur, so epsilon is "large".
+            #if (isEqual(me.heading, edgeheading,0.1)) {
+            if (isEqual(me.heading, edgeheading,1)) {
+                return e;
+            }
+        }
+        for (var i = 0; i < me.node.getEdgeCount(); i+=1) {
+            var e = me.node.getEdge(i);
+            var edgeheading = getHeadingFromDirection(e.getEffectiveInboundDirection(me.node));
+            #logging.debug(""~e.getName()~" :edgeheading="~edgeheading~", parkingheading="~me.heading);
             # large rounding errors might occur, so epsilon is "large".
             #if (isEqual(me.heading, edgeheading,0.1)) {
             if (isEqual(me.heading, edgeheading,1)) {

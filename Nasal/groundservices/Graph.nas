@@ -8,13 +8,14 @@ var pathcache = {};
 
 var Graph = {
     
-    new: func() {	    
+    new: func(orientation) {	    
 	    var obj = { parents: [Graph] };
 		#obj.nodesList = List.new();
 		#obj.edgesList = List.new();
 		obj.nodes = [];
         obj.edges = [];
         obj.smoothing = nil;
+        obj.orientation = orientation;
         return obj;
 	},
 	
@@ -111,7 +112,7 @@ var Graph = {
         var best = nil;
         var bestdistance = FloatMAX_VALUE;
         foreach (var n ; me.nodes) {
-            var distance = getDistanceXYZ(pXYZ, n.getLocation());
+            var distance = Vector3.getDistanceXYZ(pXYZ, n.getLocation());
             if (distance < bestdistance and (graphNodeFilter == nil or graphNodeFilter.acceptNode(n))) {
                 bestdistance = distance;
                 best = n;
@@ -212,7 +213,7 @@ var PathFinder = {
                 return nil;
             }
         }
-        var p = GraphPath.new(me.startnode, -1);
+        var p = GraphPath.new(-1);
         var current = me.startnode;
         foreach (var n ; path) {
             p.addSegment(GraphPathSegment.new(me.graph.findConnection(current, n),current));
@@ -269,7 +270,9 @@ var GraphEdge = {
 		obj.layer = layer;
 		obj.dir = to.getLocation().subtract(from.getLocation());
         obj.len = to.getLocation().subtract(from.getLocation()).length();
-        obj.center = nil;
+        # unused obj.customdata = nil;
+        # GraphArc
+        obj.arcParameter = nil;
         if (obj.checklen()){
             #logging.debug("len problem with "~from.getName()~":"~from.getLocation().toString()~" "~to.getName()~":"~to.getLocation().toString());
         }
@@ -288,17 +291,18 @@ var GraphEdge = {
         return me.len;
     },
     
-    # angle is radian
-    setArc: func(center, radius, angle) {
-        me.center = center;
-        me.radius = radius;
-        me.vf = me.from.getLocation().subtract(center);
-        me.vt = me.to.getLocation().subtract(center);       
-        me.angle = angle;
-        var umfang = 2 * math.pi * radius;
-        me.len = math.abs((umfang * angle / (2 * math.pi)));
+    # angle is radian (former setArc() function)
+    setArcAtFrom: func(center, radius, angle, normal) {
+        var ex = me.from.getLocation().subtract(center);
+        me.setArc(GraphArc.new(center, radius, ex, normal, angle));
+    },
+
+    setArc: func(grapharc) {
+        me.arcParameter = grapharc;
+        var umfang = 2 * PI * grapharc.getRadius();
+        me.len = abs(umfang * grapharc.beta / (2 * PI));
         if (me.checklen()){
-            logging.debug("len problem with radius "~radius);
+            logging.debug("len problem with radius " ~ grapharc.getRadius());
         }
     },
             
@@ -317,19 +321,25 @@ var GraphEdge = {
     },
         
     get3DPosition: func(edgeposition) {
-        if (me.center == nil) {
+        if (me.arcParameter == nil) {
             #line
             return me.from.getLocation().add(me.dir.multiply(edgeposition / me.len));
         }
         #arc
-        var rot = buildRotationZ(degreeFromRadians(me.angle * edgeposition / me.len));
-        var resultXYZ = me.vf.rotate(rot);
-        resultXYZ = resultXYZ.add(me.center);
+        #var rot = buildRotationZ(degreeFromRadians(me.angle * edgeposition / me.len));
+        #8.5.18 var resultXYZ = me.vf.rotate(rot);
+        #resultXYZ = resultXYZ.add(me.center);
+        var resultXYZ = me.arcParameter.getRotatedEx(edgeposition / me.len, 0);
+        resultXYZ = me.arcParameter.arccenter.add(resultXYZ);
+        #logger.debug("resultXYZ="~resultXYZ.toString()~" for position "~edgeposition);            
         return resultXYZ;
     },
     
     getCenter: func() {
-        return me.center;
+        if (me.arcParameter == nil) {
+            return nil;
+        }
+        return me.arcParameter.arccenter;
     },
     
     getDirection:func () {
@@ -337,19 +347,24 @@ var GraphEdge = {
     },
     
     getEffectiveDirection: func( edgeposition) {
-        var referenceback = Vector3.new(0, 0, -1);
-    
-        if (me.center == nil) {
+        if (me.arcParameter == nil) {
             # line. trivial.
             return me.dir.normalize();
         }
-        var degree = (me.angle < 0) ? -90 : 90;
-        var dir = rotateXY(me.vf.x,me.vf.y, radianFromDegree(degree));
-        var rotangle = me.angle * edgeposition / me.len;
+        #var degree = (me.angle < 0) ? -90 : 90;
+        #8.5.18 var dir = rotateXY(me.vf.x,me.vf.y, radianFromDegree(degree));
+        #var rotangle = me.angle * edgeposition / me.len;
         #logging.debug("getEffectiveDirection: rotangle="~rotangle~",len="~me.len);
-        dir = rotateXY(dir.x,dir.y,rotangle);
-        var arcdir = Vector3.new(dir.x,dir.y,0);
-        return arcdir.normalize();
+        #8.5.18 dir = rotateXY(dir.x,dir.y,rotangle);
+        #var arcdir = Vector3.new(dir.x,dir.y,0);
+        #return arcdir.normalize();
+        var v = me.arcParameter.getRotatedEx(edgeposition / me.len, 0);
+        if (me.arcParameter.getBeta() < 0) {
+            v = Vector3.getCrossProduct(v, me.arcParameter.n).normalize();
+        } else {
+            v = Vector3.getCrossProduct(me.arcParameter.n, v).normalize();
+        }
+        return v;                
     },
     
     getEffectiveBeginDirection: func() {
@@ -376,6 +391,10 @@ var GraphEdge = {
         return effectivedir;
     },
     
+    getAngleBetweenEdges: func(i, node, o) {
+        return Vector3.getAngleBetween(i.getEffectiveInboundDirection(node), o.getEffectiveOutboundDirection(node));
+    },
+    
     getName: func() {
         return me.name;
     },
@@ -383,7 +402,11 @@ var GraphEdge = {
     setName: func( name) {
         me.name = name;
     },
-        
+
+    equals: func(e) {
+        return e.id == me.id;
+    },
+              
     getOppositeNode: func(node) {
         if (node == me.from) {
             return me.to;
@@ -419,12 +442,23 @@ var GraphEdge = {
 	    return me.getName() ~ "(" ~ me.from.getName() ~ "->" ~ me.to.getName() ~ ")";
 	},
 	
-	getAngleBetweenEdges: func(i, node, o) {
-        return getAngleBetween(i.getEffectiveInboundDirection(node), o.getEffectiveOutboundDirection(node));
+    isArc: func() {
+        return me.arcParameter != nil;
     },
     
-    isArc: func() {
-        return me.center != nil;
+    getArc: func() {
+        return me.arcParameter;
+    },
+    
+    # Return the node connecting this edge to "e".
+    getNodeToEdge: func(e) {
+        if (me.from.findEdge(e) != nil) {
+            return me.from;
+        }
+        if (me.to.findEdge(e) != nil) {
+            return me.to;
+        }
+            return nil;
     },
 };
 
@@ -441,6 +475,9 @@ var GraphNode = {
 		obj.locationXYZ = locationXYZ;
 		obj.edges = [];
 		obj.altneedsupdate = 1;
+		obj.customdata = nil;
+		#optional GraphNode, eg. for outlined nodes        
+        obj.parent = nil;
 		append(nodes,obj);
 		return obj;
 	},
@@ -462,6 +499,17 @@ var GraphNode = {
     getEdge: func(index) {
         return me.edges[index];
     },
+    # returns array of GraphEdge
+    getEdgesExcept: func(edge) {
+        var l = [];
+        foreach (var e; me.edges){
+            if (e != edge) {
+                append(l,e);
+            }
+        }
+        return l;
+    },
+
 	getName: func() {
         return me.name;
     },
@@ -478,9 +526,22 @@ var GraphNode = {
         return me.id;
     },
     
+    equals: func(e) {
+        return e.id == me.id;
+    },
+        
     toString: func(){
 	    return me.name ; 
 	},
+	
+	findEdge: func(edge) {
+        foreach (var e ; me.edges) {
+            if (e.equals(edge)) {
+                return e;
+            }
+        }
+        return nil;
+    },
 };
 
 var GraphPosition = {
@@ -529,9 +590,8 @@ var GraphPosition = {
 };
 
 var GraphPath = {    
-    new: func( start, layer) {	    
+    new: func(layer) {	    
 	    var obj = { parents: [GraphPath] };
-	    obj.start = start;
 	    obj.layer = layer;
 	    # list of GraphPathSegment
 	    obj.path = [];
@@ -580,28 +640,48 @@ var GraphPath = {
         insertIntoList(me.path,index,segment);
     },
     
-    toString: func() {
+    toString: func(detailed=0) {
         var s = "";
         if (me.startposition != nil and me.backward) {
-            s = s ~ "[back on "+me.startposition.currentedge.getName()+"]";
+            s = s ~ "[back on " ~ me.startposition.currentedge.getName() ~ "]";
         }                 
-        s = s ~ me.start.getName() ~ ":";
         if (size(me.path) == 0) {
             return s;
         }
+        s ~= me.getStart().getName() ~ ":";                
         s ~= me.path[0].edge.getName();
         for (var i = 1; i < size(me.path); i+=1) {
-            s ~= "->" ~ me.path[i].edge.getName() ~ "(" ~ math.round(me.path[i].edge.getLength()) ~ ")";
+            var edge = me.path[i].edge;
+            var edgename = edge.getName();
+            var arcpara = edge.getArc();
+            if (detailed and arcpara != nil and arcpara.origin != nil) {
+                edgename = edgename ~ "@" ~ arcpara.origin.getName();
+            }
+            var nodetag = "->";
+            if (detailed) {
+                var enternode = me.path[i].getEnterNode();
+                nodetag = "--" ~ enternode.getName();
+                if (enternode.parent != nil) {
+                    nodetag ~= "@" ~ enternode.parent.getName();
+                }
+                nodetag ~= "-->";
+            }
+            s ~= nodetag ~ edgename ~ "(" ~ math.round(edge.getLength()) ~ ")";
         }
         return s;
     },
     
     replaceLast: func( transition) {
-        var index = size(me.path) - 1;
-        me.path[index] = transition.seg[0];
-        
-        for (var i=1;i<size(transition.seg);i+=1) {
-            append(me.path,transition.seg[i]);
+        #var index = size(me.path) - 1;
+        #me.path[index] = transition.seg[0];        
+        #for (var i=1;i<size(transition.seg);i+=1) {
+        #    append(me.path,transition.seg[i]);
+        #}
+        if (size(me.path) > 0) {
+            me.path = removeFromList(me.path,size(me.path) - 1);        
+        }
+        foreach (var s ; transition.seg) {
+            append(me.path,s);
         }
     },
     
@@ -618,6 +698,14 @@ var GraphPath = {
         return len;
     },
     
+    getStart: func() {
+        return me.path[0].getEnterNode();
+    },
+    
+    getDetailedString: func () {
+        return me.toString(true);
+    },
+        
     validateAltitude: func() {
         for (var i = 0; i<me.getSegmentCount() ; i=i+1) {
             var e = me.getSegment(i).edge;
@@ -644,6 +732,14 @@ var GraphPathSegment = {
     getLeaveNode: func() {
         return me.edge.getOppositeNode(me.enternode);
     },
+    
+    getEnterNode: func() {
+        return me.enternode;
+    },
+    
+    toString: func() {
+        return me.edge.toString();
+    },
 };
 
 var GraphTransition = {    
@@ -661,6 +757,14 @@ var GraphTransition = {
     
     add: func(graphPathSegement) {
         append(me.seg,graphPathSegement);
+    },
+    
+    toString: func() {
+        var s = "Transition:";
+        foreach (var se; me.seg) {
+            s ~= se.toString() ~ ",";
+        }
+        return s;
     },
 };
 
@@ -728,6 +832,268 @@ var TurnExtension = {
         }
         return -1;
     },
+};
+
+var GraphArc = {    
+    new: func(arccenter, radius, ex, n, beta) {	    
+	    var obj = { parents: [GraphArc] };
+	    obj.arccenter = arccenter;
+	    obj.radius = radius;
+	    obj.ex = ex.normalize();
+	    obj.n = n.normalize();
+	    # beta in radians
+	    obj.beta = beta;
+	    #origin GraphNode 
+	    obj.origin = nil;
+	    return obj;
+    },
+    
+    # Effective rotated e Vector between ex (t=0) and ey (t=1).
+    getRotatedEx: func(t) {
+        var e1 = me.ex;
+        var z2n = Quaternion.buildQuaternion(Vector3.new(0, 0, 1), me.n);
+        var n2z = Quaternion.buildQuaternion(me.n, Vector3.new(0, 0, 1));
+        var angle = -me.beta;
+        var rotated = e1.rotate(n2z);
+        rotated = rotated.rotate(buildQuaternionFromAngles(0, 0, -angle * t));
+        rotated = rotated.rotate(z2n);
+        rotated = rotated.multiply(me.radius);
+        return rotated;
+    },
+    
+    getRadius: func() {
+        return me.radius;
+    },
+    
+    getBeta: func() {
+        return me.beta;
+    },
+};
+
+# abstract class
+var GraphOrientation = {    
+	new: func() {	    
+	    var obj = { parents: [GraphOrientation] };
+	    return obj;
+	},
+   
+    buildForZ0: func() {return GraphOrientationZ0.new();},
+    buildDefault: func() {return GraphOrientationDefault.new();},
+    buildForFG: func() {return GraphOrientationFG.new();},
+        
+    get3DRotation: func(reverseorientation, effectivedirection, edge) {        
+        if (reverseorientation) {
+            effectivedirection = effectivedirection.negate();
+        }
+
+        var forwardrotation = me.getForwardRotation();
+        var up = me.getUpVector(edge);
+        var rotation = Quaternion.buildLookRotation(effectivedirection.negate(), up);
+        var localr = Quaternion.new();
+        return localr.multiply(rotation).multiply(forwardrotation);            
+    },
+    
+    # Outline along a graph.
+    getOutline: func(path, offset, layer) {
+        var lastnode = nil;
+        var edge = nil;;
+        if (path != nil and size(path) == 1 and path[0].edge.getArc() != nil) {
+            var arcsegment = path[0];
+            edge = arcsegment.edge;
+            lastnode = arcsegment.getLeaveNode();
+            if (lastnode != nil and edge.getArc() != nil) {
+                return buildArcOutline(edge, offset, 16, arcsegment.getEnterNode().equals(edge.getTo()));
+            }
+        }
+
+        var line = [];
+        if (size(path) == 0) {
+            return line;
+        }
+
+        var startnode = nil;
+        var idx = 0;
+
+        edge = path[0].edge;
+        idx+=1;
+        startnode = path[0].enternode;
+
+        # first point
+        var rotation = nil;
+        var dir = edge.getEffectiveOutboundDirection(startnode);        
+        var offsettouse = me.getOffsetToUse(edge, offset, layer);
+        var outpoint = me.getEndOutlinePoint(startnode, edge, dir, offsettouse);
+        append(line,outpoint);
+
+
+        while (edge != nil) {
+            var nextnode = edge.getOppositeNode(startnode);
+            if (nextnode == nil) {
+                #circle?
+                break;
+            }
+            if (path != nil and idx > size(path)) {
+                break;
+            }
+            
+            var nextdir = nil;
+            var nextedge = nil;
+            if (idx < size(path)) {
+                nextedge = path[idx].edge;
+                idx+=1;
+            }
+            if (nextedge != nil) {
+                nextdir = nextedge.getEffectiveOutboundDirection(nextnode);
+                var angle = degreeFromRadians(Vector3.getAngleBetween(dir, nextdir) / 2);
+                var kp = nil;
+                if (angle > 0.05) {
+                    kp = Vector3.getCrossProduct(dir, nextdir).normalize();
+                }
+                               
+                offsettouse = offset;
+                if (layer != -1 and (edge.getLayer() != layer or nextedge.getLayer() != layer)) {
+                    offsettouse = 0;
+                }
+                var offsetv = nil;
+                if (kp == nil) {
+                    #dir/nextdir parallel
+                    rotation = Quaternion.buildQuaternionFromAngleAxis(angle, me.getUpVector(edge));
+                    offsetv = Vector3.getCrossProduct(dir, me.getUpVector(edge));
+                } else {
+                    rotation = Quaternion.buildQuaternionFromAngleAxis(angle, kp);
+                    offsetv = Vector3.getCrossProduct(dir, me.getUpVector(edge));
+                }
+                offsetv = offsetv.normalize().multiply(offsettouse);
+                var outlinepoint = nextnode.getLocation().add(offsetv.rotate(rotation));
+               
+                append(line,outlinepoint);
+                #logger.debug("outline at " + nextnode.getLocation() + " is " + outlinepoint + " with angle " + angle);
+            } else {
+                # last point
+                dir = edge.getEffectiveInboundDirection(nextnode);
+                offsettouse = me.getOffsetToUse(edge, offset, layer);
+                outpoint = me.getEndOutlinePoint(nextnode, edge, dir, offsettouse);
+                append(line,outpoint);
+            }
+            # prepare next step
+            dir = nextdir;
+            edge = nextedge;
+            startnode = nextnode;
+        }        
+        return line;
+    },
+
+    getOffsetToUse:func (edge, offset, layer) {
+        var offsettouse = offset;
+        if (layer != -1 and edge.getLayer() != layer) {
+            offsettouse = 0;
+        }
+        return offsettouse;
+    },
+
+    getOutlineFromNode: func(basenode, offset) {
+        var startnode = basenode;
+        var edge = startnode.getFirstFromEdge();
+        var path = [];
+        append(path,GraphPathSegment.new(edge, startnode));
+        while (edge != nil) {
+            var nextnode = edge.getOppositeNode(startnode);
+            if (nextnode == basenode) {
+                #circle?
+                break;
+            }
+            var nextedge = nil;
+            var nextedges = nextnode.getEdgesExcept(edge);
+            if (size(nextedges) == 1) {
+                nextedge = nextedges[0];
+                append(path,GraphPathSegment.new(nextedge, nextnode));
+            } 
+            edge = nextedge;
+            startnode = nextnode;
+        }
+        return me.getOutline(path, offset, -1);
+    },
+
+    getEndOutlinePoint: func(node, edge, dir, offset) {
+        var outv = Vector3.new(offset, 0, 0);
+        var reverseorientation = false;
+        var rotation = me.get3DRotation(reverseorientation, dir, edge);
+        return node.getLocation().add(outv.rotate(rotation));
+    },
+
+    buildArcOutline: func(edge, offset, segments, reverse) {
+        var p = edge.getArc();
+        var line = [];
+
+        var center = edge.getCenter();
+        var step = 1.0 / segments;
+
+        var index = 0;
+        for (var i = 0; i <= segments; i+=1) {
+            index = i;
+            if (reverse) {
+                index = segments - i;
+            }
+            var v = p.getRotatedEx(index * step, 0);
+            v = v.normalize().multiply(p.getRadius() - (reverse ? -1 : 1) * offset);
+            v = center.add(v);
+            append(line,v);
+        }
+        return line;
+    },
+};
+
+# upVector  (0,0,1)
+var GraphOrientationZ0 = {    
+	new: func() {	    
+	    var obj = { parents: [GraphOrientationZ0,GraphOrientation.new()] };
+	    return obj;
+	},
+    
+    getForwardRotation: func() {
+        return Quaternion.new();
+    },
+
+    getUpVector: func(edge) {
+        var up = Vector3.new(0, 0, 1);        
+        return up;
+    },
+};
+
+# upVector  (0,1,0)
+var GraphOrientationDefault = {    
+	new: func() {	    
+	    var obj = { parents: [GraphOrientationDefault,GraphOrientation.new()] };
+	    return obj;
+	},
+
+    getForwardRotation: func() {
+        var rotation = Quaternion.new();
+        return rotation;
+    },
+
+    getUpVector: func(edge) {
+        var up = Vector3.new(0, 1, 0);        
+        return up;
+    },
+};
+
+var GraphOrientationFG = {    
+	new: func() {	    
+	    var obj = { parents: [GraphOrientationFG,GraphOrientation.new()] };
+	    return obj;
+	},
+
+    getForwardRotation: func() {
+        var rotation = Quaternion.buildQuaternionFromDegrees(-90, -90, 0);
+        return rotation;
+    },
+
+    getUpVector: func(edge) {
+        var up = edge.from.getLocation().normalize();
+        var baserotation = Quaternion.new();
+        return up.rotate(baserotation);
+    },    
 };
 
 var buildPositionAtNode = func( edge,  node,  intoedge) {

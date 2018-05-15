@@ -121,7 +121,9 @@ var GroundVehicle = {
         if (gmc.automove) {
             me.adjustSpeed(gmc, vc, tpf);
             vc.speedN.setValue(vc.movementSpeed);
-            var completedpath = gmc.moveForward(tpf * vc.movementSpeed);
+            var amount= tpf * vc.movementSpeed;
+            #logging.debug("moveForward by "~amount);
+            var completedpath = gmc.moveForward(amount);
             me.adjustVisual(gmc);
             if (completedpath != nil) {
                 vc.setMovementSpeed(0);
@@ -139,7 +141,7 @@ var GroundVehicle = {
         var needsspeedup = 0;
         var speedlimit = vc.getMaximumSpeed();
 
-        if (gmc.currentposition.currentedge.isArc() and gmc.currentposition.currentedge.radius < 15) {
+        if (gmc.currentposition.currentedge.isArc() and gmc.currentposition.currentedge.arcParameter.radius < 15) {
             speedlimit = vc.getMaximumSpeed() / 2;
         }
 

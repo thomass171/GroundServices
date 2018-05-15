@@ -18,7 +18,7 @@ var smoothNode = func( graph,  node,  radius,  layer) {
             var e = node.edges[i];
             if (e != edge) {
                 var effectivedir = e.getEffectiveOutboundDirection(node);
-                var angle = getAngleBetween(effectiveincomingdir, effectivedir);
+                var angle = Vector3.getAngleBetween(effectiveincomingdir, effectivedir);
                 #logging.debug("effectivedir="~effectivedir.toString());
                 #logging.debug("angle="~angle);
                                 
@@ -51,7 +51,9 @@ var extendWithEdge = func(graph, edge, len, layer) {
 
 # Caclulation of an circle embedded in an angle. Either inner arc (covering beta) shortening v1->v2 or outer arc (covering alpha) reconnecting v2->v1
 var calcArcParameter = func(   start,  e1,  intersection,  e2,  end,  radius,  inner,  radiusisdistance) {
-    #logging.debug("building arc from " ~ start.getName() ~ start.getLocation().toString() ~ " on " ~ e1.toString() ~ " by " ~ intersection.getLocation().toString() ~ " on " ~ e2.toString() ~ " to " ~ end.getName() ~ end.getLocation().toString());
+    if (graphutilsdebuglog) {
+        logging.debug("calc arc from " ~ start.getName() ~ start.getLocation().toString() ~ " by " ~ intersection.toString() ~ " to " ~ end.getName() ~ end.getLocation().toString());
+    }
     if (validateAltitude(intersection.z)){
         #the reason is still unknown TODO
         logging.warn("fixing out of range altitude in intersection");
@@ -59,7 +61,7 @@ var calcArcParameter = func(   start,  e1,  intersection,  e2,  end,  radius,  i
     }
     var v1 = e1.getEffectiveOutboundDirection(start);
     var v2 = e2.getEffectiveInboundDirection(end);
-    var alpha = PI - getAngleBetween(v1, v2);
+    var alpha = PI - Vector3.getAngleBetween(v1, v2);
     var beta = PI - alpha;
     var distancefromintersection = 0;
     if (radiusisdistance) {
@@ -68,28 +70,46 @@ var calcArcParameter = func(   start,  e1,  intersection,  e2,  end,  radius,  i
     } else {
         distancefromintersection = radius * math.tan(beta / 2);
     }
-    var kp = getCrossProduct(v1, v2);
+    var kp = Vector3.getCrossProduct(v1, v2);
     var upVector = Vector3.new(0, 0, 1);
-    if (kp.z > 0) {
-        upVector = Vector3.new(0, 0, -1);
-        beta = -beta;
-    }
-    #logging.debug("v1="~v1.toString());
-    #logging.debug("v2="~v2.toString());
-    #logging.debug("distancefromintersection="~distancefromintersection);
-                    
-    var radiusvector = getCrossProduct(v1, upVector).normalize().multiply(radius);
+    if (graphutilsdebuglog) {
+        logging.debug("v1="~v1.toString());
+        logging.debug("v2="~v2.toString());
+        logging.debug("distancefromintersection="~distancefromintersection ~ ",radius=" ~ radius ~ ",alpha=" ~ alpha ~ ",beta=" ~ beta);
+    }            
+    var radiusvector = nil;
+    var ex = Vector3.getCrossProduct(v1, kp).normalize();
+    var ey = Vector3.getCrossProduct(v2, kp).normalize();
     v2 = v2.multiply(distancefromintersection);
 
-    #logging.debug("v1="~v1.toString());
-    #logging.debug("v2="~v2.toString());
-    var arcbeginloc = start.getLocation().add(v1);
-    arcbeginloc = intersection.subtract(v1.multiply(distancefromintersection));
+    var arcbeginloc = intersection.subtract(v1.multiply(distancefromintersection));
+    radiusvector = ex.negate().multiply(radius);
     var arccenter = arcbeginloc.add(radiusvector);
-    return {arccenter:arccenter, radius:radius, distancefromintersection:distancefromintersection, arcbeginloc:arcbeginloc, beta:beta, v2:v2, inner:inner, crossproduct:kp};
+    if (graphutilsdebuglog) {
+       logger.debug("arccenter=" ~ arccenter.toString());
+       logger.debug("ex=" ~ ex.toString());
+       logger.debug("radiusvector=" ~ radiusvector.toString());
+    }
+    if (!inner) {
+        beta = beta - PI2;
+    }
+    return {arccenter:arccenter, radius:radius, distancefromintersection:distancefromintersection, arcbeginloc:arcbeginloc, beta:beta, v2:v2, crossproduct:kp, 
+        arc: GraphArc.new(arccenter, radius, ex, kp, beta)};
+};
+
+var calcArcParameterAtConnectedEdges = func(e1, e2, radius, inner, radiusisdistance) {
+    var intersectionnode = e1.getNodeToEdge(e2);
+    if (intersectionnode == nil) {
+        logger.error("edges not connected");
+        return nil;
+    }
+    var start = e1.getOppositeNode(intersectionnode);
+    var intersection = intersectionnode.getLocation();
+    var end = e2.getOppositeNode(intersectionnode);
+    return calcArcParameter(start, e1, intersection, e2, end, radius, inner, radiusisdistance);
 };
     
-addArcToAngleSimple = func( graph,  start,  e1,  mid,  e2,  end,  radius,  inner,  radiusisdistance,  layer) {
+var addArcToAngleSimple = func( graph,  start,  e1,  mid,  e2,  end,  radius,  inner,  radiusisdistance,  layer) {
     var para = calcArcParameter(start, e1, mid, e2, end, radius, inner, radiusisdistance);
     var e1len = e1.getLength();
     var e2len = e2.getLength();
@@ -111,43 +131,39 @@ addArcToAngleSimple = func( graph,  start,  e1,  mid,  e2,  end,  radius,  inner
         
 # Return edge of arc
 addArcToAngle = func( graph, start, e1, mid, e2, end, para, layer) {
+    if (graphutilsdebuglog) {
+        logging.debug("building arc from " ~ start.getName() ~ start.getLocation().toString() ~ " by " ~ mid.toString() ~ " to " ~ end.getName() ~ end.getLocation().toString());
+    }
     var mindistancefornewnode = 0.1;
     var e2len = e2.getLength();
 
     var arcbegin = nil;
-    if (getDistanceXYZ(para.arcbeginloc, start.getLocation()) > mindistancefornewnode) {
-        arcbegin = graph.addNode("smoothbegin", para.arcbeginloc);
+    if (Vector3.getDistanceXYZ(para.arcbeginloc, start.getLocation()) > mindistancefornewnode) {
+        arcbegin = graph.addNode("smootharcfrom", para.arcbeginloc);
         fixAltitude(arcbegin);
         graph.connectNodes(start, arcbegin, "smoothbegin", layer);
     } else {
         arcbegin = start;
+        logger.warn("arc low distance to start");
     }
     var arcend = nil;
     if (e2len - para.distancefromintersection > mindistancefornewnode) {
-        arcend = graph.addNode("smoothend", mid.add(para.v2));
+        arcend = graph.addNode("smootharcto", mid.add(para.v2));
         fixAltitude(arcend);
         graph.connectNodes(arcend, end, "smoothend", layer);
     } else {
         arcend = end;
+        logger.warn("arc low distance to end");
     }
 
     var arc = nil;
     arc = graph.connectNodes(arcbegin, arcend, "smootharc", layer);
-    if (para.inner) {
-        arc.setArc(para.arccenter, para.radius, -para.beta);
-    } else {
-        if (para.crossproduct.getZ() < 0) {
-            # arc needs opposite direction
-            arc.setArc(para.arccenter, para.radius, PI2 - para.beta);
-        } else {
-            arc.setArc(para.arccenter, para.radius, -PI2 - para.beta);
-        }
-    }
+    arc.setArc(para.arc);
     return arc;                
 };
 
 var createBranch = func( graph,  node,  edge,  branchlen,  angle,  layer) {
-    var branchdir = edge.getEffectiveOutboundDirection(node).rotate(buildRotationZ(angle));
+    var branchdir = edge.getEffectiveOutboundDirection(node).rotate(Quaternion.buildRotationZ(angle));
     return extend(graph,node,branchdir,branchlen,layer);
 };
 
@@ -155,14 +171,23 @@ var extend = func( graph,  node,  dir ,  len,  layer) {
     dir = dir.multiply(len);
     var destination = graph.addNode("ex", node.getLocation().add(dir));
     fixAltitude(destination);
-    var branch = graph.connectNodes(node, destination, "", layer);
+    var branch = graph.connectNodes(node, destination, "e", layer);
     return branch;
 }
 
+var extend2 = func( graph, node, location, nodename, edgename, layer) {
+    var destination = graph.addNode(nodename, location);
+    var branch = graph.connectNodes(node, destination, edgename, layer);
+    return branch;
+}
+    
 # Create teardrop by extending edge at node by an arc back to the opposite node on edge including smoothing of the intersection point.
 # For now leads to the opposite node of inbound.
 # layerid is created internally.
 var addTearDropTurn = func( graph,  node,  edge,  left,  smoothingradius,  layer, smoothnode) {    
+    if (graphutilsdebuglog) {
+        logger.debug("creating teardrop turn");
+    }
     var approach = edge;
     var vertex = approach.getOppositeNode(node);
     var angle = ((left) ? 1 : -1) * 90 / (approach.getLength() / 5);
@@ -171,18 +196,60 @@ var addTearDropTurn = func( graph,  node,  edge,  left,  smoothingradius,  layer
     var teardrop = addArcToAngleSimple(graph, branch.getOppositeNode(vertex), branch, vertex.getLocation(), approach, node, approach.getLength(), 0, 1, layer);
     if (teardrop == nil){
         logging.warn("failed to create teardrop ");
-        return nil;
+        teardrop = graph.connectNodes(node, branch.getOppositeNode(vertex));
+    } else {
+        teardrop.setName("teardrop.smootharc");
     }
-    teardrop.setName("teardrop.smootharc");
-    return buildTearDropTurn(edge, branch, teardrop);
+    if (smoothnode) {
+        smoothNode(graph, vertex, smoothingradius, layer);
+    }
+    #return buildTearDropTurn(edge, branch, teardrop);
+    return TurnExtension.new(edge, branch, teardrop);
 };
-    
+
+# Create uturn from nextnode.
+addUTurn = func(graph, nextnode, fromedge, destnode, destination, distance, smoothingradius, layer) {
+    if (graphutilsdebuglog) {
+        logger.debug("creating U turn");
+    }
+    var r = smoothingradius;
+    var d = distance;
+    var normal = Vector3.new(0, 0, 1);
+    var maindir = fromedge.getEffectiveInboundDirection(nextnode);
+    var vn = Vector3.getCrossProduct(maindir, normal).normalize();
+    var vo = vn.multiply(smoothingradius);
+    var s = math.sqrt(3 * r * r - r * d - d * d / 4);
+    var vs = maindir.multiply(s);
+    var angle =  -math.atan(s / (r + (d / 2)));
+
+    var arc0center = nextnode.getLocation().add(vo);
+    var arc1center = nextnode.getLocation().add(vn.negate().multiply(d / 2)).add(vs);
+    var arc2center = destnode.getLocation().add(vo.negate());
+
+    var e = arc1center.subtract(arc0center).multiply(0.5);
+    var n0 = arc0center.add(e);
+    var e0 = extend2(graph, nextnode, n0, "n0", "uturn0", layer);
+    e0.setArc(GraphArc.new(arc0center, r, vo.negate(), normal, angle));
+
+    var ex2 = arc1center.subtract(arc2center).multiply(0.5);
+    var n1 = arc2center.add(ex2);
+    var e1 = extend2(graph, e0.getTo(), n1, "n1", "uturn1", layer);
+    e1.setArc( GraphArc.new(arc1center, r, e.negate(), normal, PI2 - 2 * (PI_2 - math.abs(angle))));
+
+    var e2 = graph.connectNodes(e1.getTo(), destnode, "uturn2", layer);
+    e2.setArc(GraphArc.new(arc2center, r, ex2, normal, angle));
+
+    return TurnExtension.new(e0, e2, e1);
+}
+      
 # Create loop turn on a node for having a smooth transition from inbound to outbound. Needed when a smoothing arc doesn't exist or is
 # not reachable.
 # By extending edge at node by a ahort edge, an arc and an edge back to the same node.
 var addTurnLoop = func( graph,  node,  incoming,   outcoming,  layer) {
-    #logging.debug("addTurnLoop: node="~node.toString()~",incoming="~incoming.toString()~",outcoming="~outcoming.toString());        
-    var len = 20;#arbitrayry
+    if (graphutilsdebuglog) {
+        logging.debug("creating turn loop: node="~node.toString()~",incoming="~incoming.toString()~",outcoming="~outcoming.toString());
+    }        
+    var len = 20;#arbitrary
     var e1 = extend(graph,node,incoming.getEffectiveInboundDirection(node),len,layer);
     e1.setName("e1");
     var e2 = extend(graph,node,outcoming.getEffectiveInboundDirection(node),len,layer);
@@ -190,9 +257,10 @@ var addTurnLoop = func( graph,  node,  incoming,   outcoming,  layer) {
     var turnloop = addArcToAngleSimple(graph, e1.getTo(), e1, node.getLocation(), e2,e2.getTo(), len, 0, 1, layer);
     if (turnloop == nil){
         logging.warn("failed to create turnloop ");
-        return nil;
+        turnloop = graph.connectNodes(e1.getTo(), e2.getTo());
+    } else {
+        turnloop.setName("turnloop.smootharc");
     }
-    turnloop.setName("turnloop.smootharc");
     return buildTearDropTurn(e1, e2, turnloop);
 };
 
@@ -202,7 +270,7 @@ var createBack = func(graph, node, dooredge, successor, layer) {
     var ext = extend(graph, dooredge.getOppositeNode(node), successor.getEffectiveInboundDirection(dooredge.getOppositeNode(node)), dooredge.getLength(), layer);
     var arc = addArcToAngleSimple(graph, node, dooredge, dooredge.getOppositeNode(node).getLocation(), ext, ext.to, dooredge.getLength(), 1, 1, layer);
     if (arc == nil) {
-        logging.warn("teardrop failed. skipping");
+        logging.warn("createBack failed. skipping");
         arc = graph.connectNodes(node, ext.to);
     }
     return TurnExtension.new(ext, nil, arc);
@@ -216,67 +284,117 @@ var createBack = func(graph, node, dooredge, successor, layer) {
 # Several solutions:
 # 1) Try node in direction of orientation of current edge. If first segment is a current edge, a teardrop return is added.
 #
-var createPathFromGraphPosition = func( graph,  from,  to,  graphWeightProvider,  smoothingradius,  layer, smoothpath,  minimumlen) {
+var createPathFromGraphPosition = func( graph,  from,  to,  graphWeightProvider,  smoothingradius,  layer, smoothpath,  minimumlen, allowrelocation=0, lane=nil) {
     var nextnode = from.getNodeInDirectionOfOrientation();
     if (graphWeightProvider == nil) {
         graphWeightProvider = DefaultGraphWeightProvider.new(graph, 0);
     }
     var path = graph.findPath(nextnode, to, graphWeightProvider);
     if (path == nil) {
-        logging.warn("no path found");                
+        #warning only
+        logger.warn("no path found from " ~ from.toString() ~ " to " ~ to.toString());
         return nil;
     }
-    #if (graphutilsdebuglog) {
-        logging.info("createPathFromGraphPosition: from " ~ from.toString() ~ ",nextnode=" ~ nextnode.toString() ~ ",path=" ~ path.toString());
-    #}
+    logging.info("createPathFromGraphPosition: from " ~ from.toString() ~ ",nextnode=" ~ nextnode.toString() ~ ",path=" ~ path.toString());
     if (path.getSegmentCount() == 0) {
         logging.warn("no path found");
         return nil;
+    }
+    return createPathFromGraphPositionAndPath(graph, path, nextnode, from, to, smoothingradius, layer, smoothpath, minimumlen, allowrelocation, lane);
+}
+
+var createPathFromGraphPositionAndPath = func (graph, path, nextnode, from, to, smoothingradius, layer, smoothpath, minimumlen, allowrelocation, lane) {
+    if (lane == nil and path.getStart() != nextnode) {
+        logger.warn("start != nextnode");
     }
     path = bypassShorties(graph, path, minimumlen, layer);
     if (path.getSegmentCount() == 0) {
         logging.warn("bypassShorties returned empty path");
         return nil;
     }
+    
+    var useuturn = false;
+    if (lane != nil) {
+        if (from.currentedge.equals(path.getSegment(0).edge)){
+            useuturn=true;
+        }
+        path = createOutlinePath(graph, path, lane, layer,useuturn);
+    }
             
-    var smoothedpath = GraphPath.new(path.start, layer);
+    var smoothedpath = GraphPath.new(layer);
     smoothedpath.finalposition = buildPositionAtNode(path.getLast().edge,to,0);
     if (graphutilsdebuglog) {
-        logging.debug("smoothing path " ~ path.toString());
+        logging.debug("smoothing path " ~ path.toString() ~ ",useuturn=" ~ useuturn ~ ",allowrelocation=" ~ allowrelocation);
     }
     var startpos = 1;
             
     if (path.getSegmentCount() > 0) {
         var firstsegment = path.getSegment(0);
-        if (firstsegment.edge == from.currentedge) {
-            # need to turn back to my current edge. Add teardrop for turning at the end of the current edge. 
-            if (graphutilsdebuglog) {                           
-                logging.debug("creating teardrop turn. firstsegment=" ~ firstsegment.edge.toString() ~ ",from=" ~ from.currentedge.toString());
-            }
-            var turn = addTearDropTurn(graph, nextnode, from.currentedge, 1, smoothingradius, layer, 0);
-            if (turn == nil) {
-                return nil;
-            }
-            smoothedpath.addSegment(GraphPathSegment.new(turn.arc, nextnode));
-            smoothedpath.addSegment(GraphPathSegment.new(turn.branch, turn.arc.getOppositeNode(nextnode)));
-        } else {
-            # first segment is not my current one. Need to find a smooth path into first segment.
-            # current solution is turnloop.
-            # but only for small angles. otherwise there will be unrealistic turnloops
-            var angle = GraphEdge.getAngleBetweenEdges(from.currentedge, nextnode, firstsegment.edge);
-            if (angle < 0.05) {
-                smoothedpath.addSegment(firstsegment);
-                startpos = 1;
-            } else {
-                var turnloop = addTurnLoop(graph, nextnode, from.currentedge, firstsegment.edge, layer);
-                if (turnloop == nil) {
+        
+        if (from != nil) {
+            if (firstsegment.edge == from.currentedge) {
+                # need to turn back to my current edge. Add teardrop for turning at the end of the current edge. 
+                if (graphutilsdebuglog) {                           
+                    logging.debug("creating teardrop turn. firstsegment=" ~ firstsegment.edge.toString() ~ ",from=" ~ from.currentedge.toString());
+                }
+                var turn = addTearDropTurn(graph, nextnode, from.currentedge, 1, smoothingradius, layer, 0);
+                if (turn == nil) {
                     return nil;
                 }
-                smoothedpath.addSegment(GraphPathSegment.new(turnloop.edge, nextnode));
-                smoothedpath.addSegment(GraphPathSegment.new(turnloop.arc, turnloop.edge.getOppositeNode(nextnode)));
-                smoothedpath.addSegment(GraphPathSegment.new(turnloop.branch, turnloop.branch.getOppositeNode(nextnode)));
-                startpos = 0;
+                smoothedpath.addSegment(GraphPathSegment.new(turn.arc, nextnode));
+                smoothedpath.addSegment(GraphPathSegment.new(turn.branch, turn.arc.getOppositeNode(nextnode)));
+            } else {
+                # first segment is not my current one. Need to find a smooth path into first segment.
+                # current solution is turnloop.
+                # but only for small angles. otherwise there will be unrealistic turnloops
+                if (lane != nil and useuturn) {
+                    var uturn = addUTurn(graph, nextnode, from.currentedge, firstsegment.getEnterNode(), firstsegment.edge, lane.offset, smoothingradius, layer);
+                    if (uturn == nil) {
+                        return nil;
+                    }
+                    smoothedpath.addSegment( GraphPathSegment.new(uturn.edge, nextnode));
+                    smoothedpath.addSegment( GraphPathSegment.new(uturn.arc, uturn.edge.getOppositeNode(nextnode)));
+                    smoothedpath.addSegment( GraphPathSegment.new(uturn.branch, uturn.branch.getOppositeNode(firstsegment.getEnterNode())));
+                    smoothedpath.addSegment(firstsegment);
+                    startpos = 1;
+                } else {
+                    var relocationgt = nil;
+                    if (allowrelocation) {
+                        relocationgt = buildInnerArcOrTurnloopTransition(graph, from, nextnode, nextnode, nextnode.getLocation(), firstsegment.edge,
+                                firstsegment.edge.getOppositeNode(nextnode), smoothingradius, layer);
+                        if (graphutilsdebuglog) {                           
+                            logger.debug("relocation gt=" ~ relocationgt.toString());
+                        }
+                    }
+                    if (relocationgt != nil) {
+                        smoothedpath.replaceLast(relocationgt);
+                        smoothedpath.startposition = GraphPosition.new(relocationgt.seg[0].edge, from.edgeposition, false);
+                        startpos = 1;
+                    } else {                          
+                        var angle = GraphEdge.getAngleBetweenEdges(from.currentedge, nextnode, firstsegment.edge);
+                        if (graphutilsdebuglog) {                           
+                            logger.debug("angle=" ~ angle);
+                        }
+                        if (angle < 0.05 or angle > 3.14) {
+                            smoothedpath.addSegment(firstsegment);
+                            startpos = 1;
+                        } else {
+                            var turnloop = addTurnLoop(graph, nextnode, from.currentedge, firstsegment.edge, layer);
+                            if (turnloop == nil) {
+                                return nil;
+                            }
+                            smoothedpath.addSegment(GraphPathSegment.new(turnloop.edge, nextnode));
+                            smoothedpath.addSegment(GraphPathSegment.new(turnloop.arc, turnloop.edge.getOppositeNode(nextnode)));
+                            smoothedpath.addSegment(GraphPathSegment.new(turnloop.branch, turnloop.branch.getOppositeNode(nextnode)));
+                            startpos = 0;
+                        }
+                    }
+                } 
             }
+        } else {
+            # No "from".
+            smoothedpath.addSegment(path.getSegment(0));
+            startpos = 1;
         }
     }
     for (var i = startpos; i < path.getSegmentCount(); i+=1) {
@@ -297,12 +415,15 @@ var createPathFromGraphPosition = func( graph,  from,  to,  graphWeightProvider,
             smoothedpath.addSegment(segment);
         }
     }
+    if (graphutilsdebuglog) {
+        logger.debug("smoothed path: " ~ ((smoothedpath==nil)?"nil":smoothedpath.toString()));
+    }
     return smoothedpath;       
 };
 
 # bypass too short edges.
 var bypassShorties = func( graph,  path,  minimumlen,  layer) {
-    var np = GraphPath.new(path.start, path.layer);
+    var np = GraphPath.new(path.layer);
     var lastsegment = nil;
     for (var i = 0; i < path.getSegmentCount(); i+=1) {
         var segment = path.getSegment(i);
@@ -328,7 +449,7 @@ var bypassShorties = func( graph,  path,  minimumlen,  layer) {
             } else {
                 # bypass back
                 if (graphutilsdebuglog) {
-                    #logging.debug("bypass back. segment "~i);
+                    #logging.debug("bypass back segment "~i);
                 }
                 var bypass = graph.connectNodes(lastsegment.enternode, segment.getLeaveNode(), "bypass", layer);
                 lastsegment = GraphPathSegment.new(bypass, lastsegment.enternode);
@@ -336,7 +457,7 @@ var bypassShorties = func( graph,  path,  minimumlen,  layer) {
             }
         } else {   
             if (graphutilsdebuglog) {
-                #logging.debug("no bypass. segment "~i);
+                #logging.debug("no bypass segment "~i);
             }                     
             np.addSegment(segment);
             lastsegment = segment;
@@ -347,7 +468,7 @@ var bypassShorties = func( graph,  path,  minimumlen,  layer) {
 
 # intersecton of 2 edges. 2D only!
 # returns locationXYZ
-getIntersection = func( e1,  e2) {
+var getIntersection = func( e1,  e2) {
     var line1start = Vector2.new(e1.getFrom().getLocation().getX(), e1.getFrom().getLocation().getY());
     var line1end = Vector2.new(e1.getTo().getLocation().getX(), e1.getTo().getLocation().getY());
     var line2start = Vector2.new(e2.getFrom().getLocation().getX(), e2.getFrom().getLocation().getY());
@@ -364,14 +485,16 @@ getIntersection = func( e1,  e2) {
 # a) add branch on current edge if the current position provides enough space.
 # b) if a isn't possible, extend the current edge at the next node and add a turn loop.
 # only 2D, z=0.
-createTransition = func( graph,  from,  destinationedge,  destinationnode,  smoothingradius,  layer) {
+var createTransition = func( graph,  from,  destinationedge,  destinationnode,  smoothingradius,  layer) {
+    var connectingnode = nil;
     if (from.currentedge.getCenter() != nil) {
         logging.warn("not yet from arcs");
         return nil;
     }
     var nextnode = from.getNodeInDirectionOfOrientation();
-    #logging.debug("createTransition from position " ~ from.toString() ~ " heading " ~ nextnode.toString() ~ " to " ~ destinationnode.toString() ~ " on " ~ destinationedge.toString());
-   
+    if (graphutilsdebuglog) {
+        logging.debug("createTransition from position " ~ from.toString() ~ " heading " ~ nextnode.toString() ~ " to " ~ destinationnode.toString() ~ " on " ~ destinationedge.toString());
+    }
     if (from.currentedge == destinationedge) {
         # need to turn back to my current edge. Add teardrop for turning at the end of the current edge. 
         var turn = addTearDropTurn(graph, nextnode, from.currentedge, 1, smoothingradius, layer, 0);
@@ -386,10 +509,11 @@ createTransition = func( graph,  from,  destinationedge,  destinationnode,  smoo
     var destinationisconnected = 0;
     if (nextnode == destinationedge.getOppositeNode(destinationnode)) {
         destinationisconnected = 1;
+        connectingnode = nextnode;
     }
     # intersection cannot be used for checking parallel
     var isparallel = 0;
-    var angle = getAngleBetween(from.currentedge.getDirection(), destinationedge.getDirection());
+    var angle = Vector3.getAngleBetween(from.currentedge.getDirection(), destinationedge.getDirection());
     if (angle < 0.0001 or angle > PI - 0.0001) {
         isparallel = 1;
     }
@@ -422,50 +546,82 @@ createTransition = func( graph,  from,  destinationedge,  destinationnode,  smoo
         }
     }
    
-    var start = from.currentedge.getOppositeNode(nextnode);
-    var e1 = from.currentedge;
-    var arcpara = calcArcParameter(start, e1, intersection, destinationedge, destinationnode, smoothingradius, 1, 0);
-    if (arcpara == nil) {
-        return nil;
-    }
-    var relpos = compareEdgePosition(from, arcpara.arcbeginloc);
-    #logging.debug("relpos=" ~ relpos);
-    if (relpos > 0) {
-        # arc ahead of current position. inner arc can be used.
-        var arc = addArcToAngle(graph, start, e1, intersection, destinationedge, destinationnode, arcpara, layer);
-        var gt = GraphTransition.new();
-        #TODO oder arc.to? oder from?
-        gt.add(GraphPathSegment.new(graph.connectNodes(start, arc.from, "smoothbegin." ~ nextnode.getName(),layer), start));
-        gt.add(GraphPathSegment.new(arc, destinationedge.getOppositeNode(destinationnode)));
-        gt.add(GraphPathSegment.new(graph.connectNodes(arc.to, destinationnode, "smoothend." ~ nextnode.getName(),layer), arc.getTo()));
-        #logging.debug("created inner arc");
+    var gt = buildInnerArcOrTurnloopTransition(graph, from, nextnode, connectingnode, intersection, destinationedge, destinationnode, smoothingradius, layer);
+    if (gt != nil) {
         return gt;
-    } else if (relpos < 0) {
-        #behind. Turnloop transition at the end of current edge.
-        var len = 5;
-        #??arcpara = calcArcParameter( start, e1, intersection, destinationedge, destinationnode, len, 0, 1);
-        #??return createTurnLoop(graph,nextnode,e1,intersection,destinationedge,destinationnode,arcpara,layer);
-        var turnloop = addTurnLoop(graph, nextnode, from.currentedge, destinationedge, layer);
-        if (turnloop == nil) {
-            return nil;
-        }
-        var gt = GraphTransition.new();
-        gt.add(GraphPathSegment.new(turnloop.edge, nextnode));
-        gt.add(GraphPathSegment.new(turnloop.arc, turnloop.edge.getOppositeNode(nextnode)));
-        gt.add(GraphPathSegment.new(turnloop.branch, turnloop.edge.getOppositeNode(nextnode)));
-        logging.debug("created turnloop");
-        return gt;
-    }
-
+    }       
+    
     if (graphutilsdebuglog) {
         logging.warn("created no transition");
     }
     return nil;
 };
 
+# returns GraphTransition
+var buildInnerArcOrTurnloopTransition = func(graph, from, nextnode,connectingnode , intersection, destinationedge, destinationnode, smoothingradius, layer) {
+    var destinationisconnected = connectingnode != nil;
+    var relpos = 0;
+    for (var i = 0; i < 4; i+=1) {
+        var start = from.currentedge.getOppositeNode(nextnode);
+        var e1 = from.currentedge;
+        var arcpara = nil;
+        if (destinationisconnected) {
+            arcpara = calcArcParameterAtConnectedEdges(e1, destinationedge, smoothingradius, true, false);
+            if (arcpara == nil) {
+                # already logged
+                return nil;
+            }
+            arcpara.arc.origin=connectingnode;
+        } else {
+            arcpara = calcArcParameter(start, e1, intersection, destinationedge, destinationnode, smoothingradius, true, false);
+            if (arcpara == nil) {
+                #already logged
+                return nil;
+            }
+        }
+        relpos = compareEdgePosition(from, arcpara.arcbeginloc);
+        if (graphutilsdebuglog) {
+            logger.debug("relpos=" ~ relpos);
+        }
+        if (relpos > 0) {
+            # arc ahead of current position. inner arc can be used.
+            var arc = addArcToAngle(graph, start, e1, intersection, destinationedge, destinationnode, arcpara, layer);
+            if (arc == nil) {
+                logger.warn("createTransition: inner arc failed. Too large?");
+                return nil;
+            }
+            var gt = GraphTransition.new();
+            gt.add(GraphPathSegment.new(graph.connectNodes(start, arc.from, "smoothbegin." ~ nextnode.getName(), layer), start));
+            gt.add(GraphPathSegment.new(arc, arc.from));
+            gt.add(GraphPathSegment.new(graph.connectNodes(arc.to, destinationnode, "smoothend." ~ nextnode.getName(), layer), arc.getTo()));
+            if (graphutilsdebuglog) {
+                logger.debug("created inner arc");
+            }
+            return gt;
+        }
+        smoothingradius *= 0.8;
+    }
+    if (relpos < 0) {
+        #behind. Turnloop transition at the end of current edge. Logging because this might be ugly?
+        logger.warn("building turn loop transition");
+        var len = 5;
+        var turnloop = addTurnLoop(graph, nextnode, from.currentedge, destinationedge, layer);
+        var gt = GraphTransition.new();
+        gt.add(GraphPathSegment.new(turnloop.edge, nextnode));
+        gt.add(GraphPathSegment.new(turnloop.arc, turnloop.edge.getOppositeNode(nextnode)));
+        gt.add(GraphPathSegment.new(turnloop.branch, turnloop.edge.getOppositeNode(nextnode)));
+        if (graphutilsdebuglog) {
+            logger.debug("created turnloop");
+        }
+        return gt;
+    }
+    # no transition possible. Probably never reached here.
+    return nil;
+}
+    
 # is "v" logically ahead (>0), on (0), or behind (<0) the current position?
 # v must be on the same line as the edge!
-compareEdgePosition = func( position,  v) {
+var compareEdgePosition = func( position,  v) {
     if (position.currentedge.getCenter() != nil) {
         logging.warn("not yet from arcs");
         return 0;
@@ -477,15 +633,15 @@ compareEdgePosition = func( position,  v) {
     if (difflen < 0.01) {
         return 0;
     }
-    var angle = getAngleBetween(position.currentedge.getEffectiveInboundDirection(position.getNodeInDirectionOfOrientation()), diffXYZ);
+    var angle = Vector3.getAngleBetween(position.currentedge.getEffectiveInboundDirection(position.getNodeInDirectionOfOrientation()), diffXYZ);
     if (angle < PI_2) {
         return difflen;
     }
     return -difflen;
 };
 
-createBackPathFromGraphPosition = func(graph, startnode, startedge, turn, to, graphWeightProvider, smoothingradius, layer, smoothpath, minimumlen) {
-    var path = createPathFromGraphPosition(graph, GraphPosition.new(turn.edge, turn.edge.getLength(), 1), to, graphWeightProvider, smoothingradius, layer, smoothpath, minimumlen);
+var createBackPathFromGraphPosition = func(graph, turn, to, graphWeightProvider, smoothingradius, layer, smoothpath, minimumlen, allowrelocation, lane) {
+    var path = createPathFromGraphPosition(graph, GraphPosition.new(turn.edge, turn.edge.getLength(), 1), to, graphWeightProvider, smoothingradius, layer, smoothpath, minimumlen, allowrelocation, lane);
     if (path == nil) {
         return nil;
     }
@@ -499,5 +655,34 @@ createBackPathFromGraphPosition = func(graph, startnode, startedge, turn, to, gr
     path.startposition = GraphPosition.new(turn.arc, turn.arc.getLength(), 1);
     return path;
 };
+
+var createOutlinePath = func( graph, path, graphlane, layer, beginwithoutline) {
+    var offset = graphlane.offset;
+
+    var outline = graph.orientation.getOutline(path.path, offset, 0);
+    var from = nil;
+    if (beginwithoutline) {
+        from = graph.addNode("outline0", outline[0]);
+    }else{
+        from = path.getSegment(0).getEnterNode();
+    }
+
+    var e = nil;
+    var newpath = GraphPath.new(layer);
+    for (var i = 1; i < size(outline) - 2; i+=1) {
+        var destnode = graph.addNode("outline" ~ i, outline[i]);
+        destnode.parent = path.getSegment(i).getEnterNode();
+        e = graph.connectNodes(from, destnode, "toOutline" ~ i, layer);
+        newpath.addSegment(GraphPathSegment.new(e, from));
+        from = destnode;
+    }
+    var reenternode = path.getLast().getEnterNode();
+    e = graph.connectNodes(from, reenternode, "reenter", layer);
+    newpath.addSegment(GraphPathSegment.new(e, from));
+    e = graph.connectNodes(reenternode, path.getLast().getLeaveNode(), "last", layer);
+    newpath.addSegment(GraphPathSegment.new(e, reenternode));
+    logger.debug("outline path created:" ~ newpath.toString());
+    return newpath;
+}
     
 logging.debug("completed GraphUtils.nas");
