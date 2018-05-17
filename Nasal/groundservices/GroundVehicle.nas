@@ -10,7 +10,7 @@ var graphmovementdebuglog = 1;
 
 
 var GroundVehicle = {
-	new: func(model, gmc, maximumspeed, type, delay, zoffset) {
+	new: func(model, gmc, maximumspeed, type, delay, zoffset, modeltype) {
 	    logging.debug("new GroundVehicle. model="~model);
 		#props.globals.getNode("gear/gear[0]/wow", 1).setValue(1);
 		#props.globals.getNode("sim/model/pushback/enabled", 1).setValue(1);
@@ -53,7 +53,7 @@ var GroundVehicle = {
         maximumspeedN.setValue(maximumspeed);
         var speedN = m.ai.getNode("velocities/speed-ms", 1);
         
-        m.vhc = VehicleComponent.new(type,m.aiid);
+        m.vhc = VehicleComponent.new(type,m.aiid,modeltype);
         m.vc = VelocityComponent.new(maximumspeedN, speedN);
 
 		#m.update();
@@ -127,10 +127,8 @@ var GroundVehicle = {
             me.adjustVisual(gmc);
             if (completedpath != nil) {
                 vc.setMovementSpeed(0);
-                #if (visualizer != nil) {
-                #    visualizer.removeLayer(p.layer);
-                #}                            
-                groundnet.groundnetgraph.removeLayer(completedpath.layer);
+                #now in update groundnet.groundnetgraph.removeLayer(completedpath.layer);
+                sendEvent({type:GRAPH_EVENT_PATHCOMPLETED, vehicle: me, path:completedpath});
             }  
         }                          
     },
@@ -408,7 +406,7 @@ var VEHICLE_CATERING = "catering";
 
 var VehicleComponent = {
     
-    new: func(type,aiid) {	    
+    new: func(type,aiid,modeltype) {	    
 	    var obj = { parents: [VehicleComponent] };
 	    obj.statechangetimestamp = 0;
 	    obj.type = type;
@@ -418,7 +416,7 @@ var VehicleComponent = {
 	    obj.aiid = aiid;
 	    obj.createtimestamp = systime();
 	    obj.schedule = nil;
-	    obj.config = {type:type};
+	    obj.config = {type:type,modeltype:modeltype};
 		return obj;
 	},
 		    
@@ -491,15 +489,16 @@ var VelocityComponent = {
 };
 
 # Only return idle vehicles because moving ones cannot relocated (due to unknwon layer)
-var findAvailableVehicle = func(vehicletype) {
+var findAvailableVehicles = func(vehicletype) {
+    var list = [];
     foreach (var v; values(GroundVehicle.active)) {
         var vhc = v.vhc;
         var gmc = v.gmc;
         if (vhc.type == vehicletype and vhc.isIdle() and gmc.isMoving() == nil) {
-            return v;
+            append(list,v);
         }
     }
-    return nil;
+    return list;
 };
     
 logging.debug("completed GroundVehicle.nas");

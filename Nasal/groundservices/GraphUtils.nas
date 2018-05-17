@@ -4,7 +4,7 @@
 
 logging.debug("executing GraphUtils.nas");
 
-var graphutilsdebuglog = 1;
+var graphutilsdebuglog = 0;
 
 var smoothNode = func( graph,  node,  radius,  layer) {
     logging.error("smoothNode should not be used");
@@ -36,7 +36,7 @@ var smoothNode = func( graph,  node,  radius,  layer) {
 };
 
 var addAlternateRouteByArc = func( graph,  start,  e1,  mid,  e2,  end,  radius,  layer) {
-    return addArcToAngleSimple(graph, start, e1, mid.getLocation(), e2, end, radius, 1, 0, layer);
+    return addArcToAngleSimple(graph, start, e1, mid.getLocation(), e2, end, radius, 1, 0, layer, false);
 };
 
 var extendWithEdge = func(graph, edge, len, layer) {
@@ -109,7 +109,7 @@ var calcArcParameterAtConnectedEdges = func(e1, e2, radius, inner, radiusisdista
     return calcArcParameter(start, e1, intersection, e2, end, radius, inner, radiusisdistance);
 };
     
-var addArcToAngleSimple = func( graph,  start,  e1,  mid,  e2,  end,  radius,  inner,  radiusisdistance,  layer) {
+var addArcToAngleSimple = func( graph,  start,  e1,  mid,  e2,  end,  radius,  inner,  radiusisdistance,  layer, nonregular) {
     var para = calcArcParameter(start, e1, mid, e2, end, radius, inner, radiusisdistance);
     var e1len = e1.getLength();
     var e2len = e2.getLength();
@@ -126,11 +126,11 @@ var addArcToAngleSimple = func( graph,  start,  e1,  mid,  e2,  end,  radius,  i
         return nil;
     }
 
-    return addArcToAngle(graph, start, e1, mid, e2, end, para, layer);
+    return addArcToAngle(graph, start, e1, mid, e2, end, para, layer, nonregular);
 };
         
 # Return edge of arc
-addArcToAngle = func( graph, start, e1, mid, e2, end, para, layer) {
+addArcToAngle = func( graph, start, e1, mid, e2, end, para, layer, nonregular) {
     if (graphutilsdebuglog) {
         logging.debug("building arc from " ~ start.getName() ~ start.getLocation().toString() ~ " by " ~ mid.toString() ~ " to " ~ end.getName() ~ end.getLocation().toString());
     }
@@ -152,8 +152,13 @@ addArcToAngle = func( graph, start, e1, mid, e2, end, para, layer) {
         fixAltitude(arcend);
         graph.connectNodes(arcend, end, "smoothend", layer);
     } else {
-        arcend = end;
         logger.warn("arc low distance to end");
+        if (nonregular) {
+            arcend = end;
+        } else {
+            arcend = graph.addNode("smootharcto", end.getLocation());
+            fixAltitude(arcend);                        
+        }
     }
 
     var arc = nil;
@@ -177,6 +182,7 @@ var extend = func( graph,  node,  dir ,  len,  layer) {
 
 var extend2 = func( graph, node, location, nodename, edgename, layer) {
     var destination = graph.addNode(nodename, location);
+    fixAltitude(destination);        
     var branch = graph.connectNodes(node, destination, edgename, layer);
     return branch;
 }
@@ -193,7 +199,7 @@ var addTearDropTurn = func( graph,  node,  edge,  left,  smoothingradius,  layer
     var angle = ((left) ? 1 : -1) * 90 / (approach.getLength() / 5);
     var branch = createBranch(graph, vertex, approach, approach.getLength(), angle, layer);
     branch.setName("teardrop.branch");
-    var teardrop = addArcToAngleSimple(graph, branch.getOppositeNode(vertex), branch, vertex.getLocation(), approach, node, approach.getLength(), 0, 1, layer);
+    var teardrop = addArcToAngleSimple(graph, branch.getOppositeNode(vertex), branch, vertex.getLocation(), approach, node, approach.getLength(), 0, 1, layer, true);
     if (teardrop == nil){
         logging.warn("failed to create teardrop ");
         teardrop = graph.connectNodes(node, branch.getOppositeNode(vertex));
@@ -254,7 +260,7 @@ var addTurnLoop = func( graph,  node,  incoming,   outcoming,  layer) {
     e1.setName("e1");
     var e2 = extend(graph,node,outcoming.getEffectiveInboundDirection(node),len,layer);
     e2.setName("e2");
-    var turnloop = addArcToAngleSimple(graph, e1.getTo(), e1, node.getLocation(), e2,e2.getTo(), len, 0, 1, layer);
+    var turnloop = addArcToAngleSimple(graph, e1.getTo(), e1, node.getLocation(), e2,e2.getTo(), len, 0, 1, layer, true);
     if (turnloop == nil){
         logging.warn("failed to create turnloop ");
         turnloop = graph.connectNodes(e1.getTo(), e2.getTo());
@@ -268,7 +274,7 @@ var addTurnLoop = func( graph,  node,  incoming,   outcoming,  layer) {
 #Return TurnExtension
 var createBack = func(graph, node, dooredge, successor, layer) {
     var ext = extend(graph, dooredge.getOppositeNode(node), successor.getEffectiveInboundDirection(dooredge.getOppositeNode(node)), dooredge.getLength(), layer);
-    var arc = addArcToAngleSimple(graph, node, dooredge, dooredge.getOppositeNode(node).getLocation(), ext, ext.to, dooredge.getLength(), 1, 1, layer);
+    var arc = addArcToAngleSimple(graph, node, dooredge, dooredge.getOppositeNode(node).getLocation(), ext, ext.to, dooredge.getLength(), 1, 1, layer, true);
     if (arc == nil) {
         logging.warn("createBack failed. skipping");
         arc = graph.connectNodes(node, ext.to);
@@ -585,7 +591,7 @@ var buildInnerArcOrTurnloopTransition = func(graph, from, nextnode,connectingnod
         }
         if (relpos > 0) {
             # arc ahead of current position. inner arc can be used.
-            var arc = addArcToAngle(graph, start, e1, intersection, destinationedge, destinationnode, arcpara, layer);
+            var arc = addArcToAngle(graph, start, e1, intersection, destinationedge, destinationnode, arcpara, layer, false);
             if (arc == nil) {
                 logger.warn("createTransition: inner arc failed. Too large?");
                 return nil;
@@ -663,6 +669,7 @@ var createOutlinePath = func( graph, path, graphlane, layer, beginwithoutline) {
     var from = nil;
     if (beginwithoutline) {
         from = graph.addNode("outline0", outline[0]);
+        fixAltitude(from);                    
     }else{
         from = path.getSegment(0).getEnterNode();
     }
@@ -671,6 +678,7 @@ var createOutlinePath = func( graph, path, graphlane, layer, beginwithoutline) {
     var newpath = GraphPath.new(layer);
     for (var i = 1; i < size(outline) - 2; i+=1) {
         var destnode = graph.addNode("outline" ~ i, outline[i]);
+        fixAltitude(destnode);                    
         destnode.parent = path.getSegment(i).getEnterNode();
         e = graph.connectNodes(from, destnode, "toOutline" ~ i, layer);
         newpath.addSegment(GraphPathSegment.new(e, from));

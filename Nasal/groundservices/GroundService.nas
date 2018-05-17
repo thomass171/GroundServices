@@ -231,12 +231,12 @@ var VehicleOrderAction = {
 	
 	# A currently moving vehicle cannot be relocted for now because it most likely runs on a temporary unknown layer (-> "no path found");
     dotrigger: func() {
-        me.schedule.vehicle = findAvailableVehicle(me.vehicletype);
-        if (me.schedule.vehicle == nil) {
+        var vlist = findAvailableVehicles(me.vehicletype);
+        if (size(vlist) == 0) {
             logging.warn("VehicleOrderAction: no available vehicle found for type "~me.vehicletype);
             return;
         }
-
+        me.schedule.vehicle = vlist[0];
         me.setState(1);
         var vhc = me.schedule.vehicle.vhc;
         var gmc = me.schedule.vehicle.gmc;

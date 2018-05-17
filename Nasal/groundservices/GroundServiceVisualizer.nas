@@ -81,7 +81,9 @@ var openMap = func() {
     window.setTitle("Ground Services");
     var myCanvas = window.getCanvas(1);
     var group = window.getCanvas(1).createGroup();
-    myCanvas.set("background", canvas.style.getColor("bg_color"));        
+    #improve contrast by darker background
+    #myCanvas.set("background", canvas.style.getColor("bg_color"));        
+    myCanvas.set("background", "#BBBBBB");       
     var myLayout = canvas.VBoxLayout.new();
     window.setLayout(myLayout);
        

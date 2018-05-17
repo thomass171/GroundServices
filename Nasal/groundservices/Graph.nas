@@ -769,12 +769,17 @@ var GraphTransition = {
 };
 
 var DefaultGraphWeightProvider = {    
-    new: func( graph, validlayer) {	    
+    new: func( graph, validlayer, voidedges = nil) {	    
 	    var obj = { parents: [DefaultGraphWeightProvider] };
 	    obj.graph = graph;
 	    # me.validlayer is int array, parameter is int
 	    obj.validlayer = [validlayer];
-	    obj.voidedges = [];
+	    if (voidedges == nil) {
+	        obj.voidedges = [];
+	    } else {
+	        logger.debug("Building DefaultGraphWeightProvider with "~size(voidedges)~" void edges");
+	        obj.voidedges = voidedges;
+	    }
 	    return obj;
     },
     

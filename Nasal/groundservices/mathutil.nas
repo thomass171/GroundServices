@@ -196,6 +196,22 @@ var isEqual = func (f1,f2,epsilon=FLT_EPSILON) {
 	return 1;
 };
 
+var isEqualDegree = func( d1, d2 ,epsilon=FLT_EPSILON) {
+    d1 = normalizeDegree(d1);
+    d2 = normalizeDegree(d2);
+    return isEqual(d1,d2,epsilon);
+};
+
+var normalizeDegree = func(d) {
+    while (d < 0) {
+        d += 360;
+    }
+    while (d > 360){
+        d -= 360;
+    }
+    return d;
+};
+    
 var Vector2 = {
     new: func(x=0,y=0) {	    
 	    var obj = { parents: [Vector2] };

@@ -53,6 +53,8 @@ var autoserviceNode = nil;
 var schedulesN = nil;
 var servicepointsN = nil;
 var maprangeNode = nil;
+var delayfornearbyaircraftNode = nil;
+
 
 #increased for avoiding vehicles that are blocked due to missing escape path (eg. missing teardrop turn) to waste CPU time
 #increased to 60 for having more vehicles ready for service
@@ -72,6 +74,10 @@ var activetimestamp = 0;
 var collectradius = 500;
 var false = 0;
 var true = 1;
+var delayfornearbyaircraftlist = [];
+
+var GRAPH_EVENT_PATHCOMPLETED = 1;
+var eventqueue = [];
 
 var report = func {
     #atc_msg("Ground Service Status: "~statusNode.getValue());
@@ -145,7 +151,8 @@ var createVehicle = func(sim_ai_index, graphposition=nil, delay=0) {
     vehicle_node = props.globals.getNode("/sim/ai/groundservices",1).getChild("vehicle", sim_ai_index, 1);
 	var model = vehicle_node.getNode("model", 1).getValue();		
 	var type  = vehicle_node.getNode("type", 1).getValue();
-	var maximumspeed = vehicle_node.getNode("maximumspeed",1).getValue() or 5;
+	var modeltype  = vehicle_node.getNode("modeltype", 1).getValue() or "";
+    var maximumspeed = vehicle_node.getNode("maximumspeed",1).getValue() or 5;
 	# zoffset 0 will be used when no tag exists.
 	var zoffset = vehicle_node.getNode("zoffset",1).getValue() or 0;
     var unscheduledmoving = vehicle_node.getNode("unscheduledmoving",1).getValue();
@@ -161,9 +168,9 @@ var createVehicle = func(sim_ai_index, graphposition=nil, delay=0) {
             graphposition = groundnet.getParkingPosition(home);            
         }
 	    if (type == "aircraft") {
-	        # position aircraft to the southwest most park position (just arbitrary).
-	        var southwest = cloneCoord(center).apply_course_distance(225, 25000);
-	        var parking = groundnet.getParkPosNearCoordinates(southwest);
+	        # position aircraft to some outside park position (just arbitrary).
+	        var outside = getOutside();
+	        var parking = getNearbyParking(outside);
 	        if (parking != nil) {
 	            logging.debug("new aircraft at parking "~parking.toString());
 	            var newgraphposition = groundnet.getParkingPosition(parking);
@@ -178,7 +185,7 @@ var createVehicle = func(sim_ai_index, graphposition=nil, delay=0) {
         }
 	}
     gmc = GraphMovingComponent.new(nil,nil,graphposition,unscheduledmoving);	
-	var vehicle = GroundVehicle.new( model, gmc, maximumspeed, type,delay, zoffset );
+	var vehicle = GroundVehicle.new( model, gmc, maximumspeed, type,delay, zoffset, modeltype );
 	return vehicle;
 }
 
@@ -199,7 +206,8 @@ var requestMove = func(vehicletype, parkposname) {
 }
 
 #
-# Request service at some specific parkpos, for an arrive aircraft or for current aircraft
+# Request service at some specific parkpos for an arrived AI aircraft, the current aircraft or an GS aircraft.
+# "parkpos" is the name of the parking position.
 #
 var requestService = func(aircraftlabel = nil, parkpos = nil) {
     if (parkpos == nil and aircraftlabel == nil) {
@@ -208,6 +216,7 @@ var requestService = func(aircraftlabel = nil, parkpos = nil) {
         spawnService(myaircraft);
     } else {
         if (aircraftlabel == nil) {
+            # empty parkpos or GS aircraft
             var parking = groundnet.getParkPos(parkpos);
             if (parking != nil) {
                  logging.debug("requestService for parkpos "~parkpos);
@@ -221,8 +230,26 @@ var requestService = func(aircraftlabel = nil, parkpos = nil) {
             logging.debug("requestService for arrived aircraft "~aircraftlabel);
             var keys = keys(arrivedaircraft);
             if (size(keys)>0){
-                spawnService(arrivedaircraft[keys[0]]);
+                var aa = arrivedaircraft[keys[0]];
+                spawnService(aa);
             }
+        }
+    }
+}
+
+#
+# Request an AI aircraft (independent from AI subsystem) to arrive at some specific nearby parking position
+# The aircraft is taken from the ground services vehicles aircrafts, residing at some outside location. 
+#
+var requestArrivingAircraft = func(destination) {
+    #var launchedge = groundnet.groundnetgraph.findEdgeByName("89-90");
+    #var start = GraphPosition.new(launchedge);
+    var vlist = findAvailableVehicles(VEHICLE_AIRCRAFT);
+    foreach(var aircraft; vlist) {
+        # avoid non airliner
+        if (aircraft.vhc.config.modeltype == "737") {
+            spawnMovingAircraft(aircraft, destination, nil);
+            return;
         }
     }
 }
@@ -246,7 +273,29 @@ var update = func() {
     var currenttime = math.round(systime());
     
     # current state is active
-        
+    
+    foreach (var event; eventqueue) {
+        logger.debug("Processing event " ~ event.type);
+        if (event.type == GRAPH_EVENT_PATHCOMPLETED) {
+            groundnet.groundnetgraph.removeLayer(event.path.layer);
+            var vhc = event.vehicle.vhc;
+            # if it is an aircraft and located on a parkos (and not willing to depart) request service.
+            var gmc = event.vehicle.gmc;
+            var positionXYZ = gmc.currentposition.get3DPosition();
+            var coord = projection.unproject(positionXYZ);
+            var closestparking = groundnet.getParkPosNearCoordinates(coord)[0];
+            logger.debug("currentpos=" ~ positionXYZ.toString() ~ ",closestparking=" ~ closestparking.name);
+            if (vhc.config.type == VEHICLE_AIRCRAFT and Vector3.getDistanceXYZ(positionXYZ,closestparking.getLocation()) < 10) {
+                #requestService(event.vehicle);
+                #TODO modeltyper 737 
+                var virtualaircraft = buildArrivedAircraft(nil, closestparking.coord, "737", "--", closestparking.customdata.heading,0);
+                spawnService(virtualaircraft);
+            }
+        } elsif (event.type == 5666) {
+        }
+    }
+    eventqueue = [];
+    
     # is there a better solution for detecting left airport?
     if (lastcheckforstandby < currenttime - 15) {
         lastcheckforstandby = currenttime;
@@ -335,6 +384,22 @@ var update = func() {
         }
     }
     
+    #check for nearby aircraft spawning
+    forindex (var index; delayfornearbyaircraftlist) {
+        var delayfornearbyaircraft = delayfornearbyaircraftlist[index];
+        #logger.debug("delayfornearbyaircraft="~delayfornearbyaircraft);
+        if (delayfornearbyaircraft > 0 and currenttime > activetimestamp + delayfornearbyaircraft) {
+            var parkinglist = groundnet.getParkPosNearCoordinates(getAircraftPosition());
+            # first list element is my own park pos
+            if (size(parkinglist) > index+1) {
+                var nearbyparking = parkinglist[index+1].customdata;
+                logger.info("Requesting nearby aircraft to position " ~ nearbyparking.name ~ ". index="~index);
+                requestArrivingAircraft(nearbyparking);
+                delayfornearbyaircraftlist[index] = 0;
+            }
+        }
+    }
+    
     #update vehicles in every frame.          
     foreach (var v; values(GroundVehicle.active)) {
         var gmc = v.gmc;
@@ -395,8 +460,30 @@ var spawnMoving = func(vehicle, destinationnode) {
     }
 };
 
-#spawn service point for aircraft    
+# startposition not used for now
+var spawnMovingAircraft = func(vehicle, parking, startposition) {
+    var vhc = vehicle.vhc;
+    logger.debug("spawnMovingAircraft: vehicle.type=" ~ vhc.config.type); 
+    var gmc = vehicle.gmc;
+    var approachedge = parking.getApproach();
+    var voidedges = [];
+    if (approachedge != nil) {
+        voidedges = parking.node.getEdgesExcept(approachedge);
+        foreach(var vo; voidedges){
+            logger.debug("void is "~vo.toString());
+        }
+    }
+    var graphWeightProvider = DefaultGraphWeightProvider.new(groundnet.groundnetgraph, 0, voidedges);
+    
+    var path = groundnet.createPathFromGraphPosition(gmc.currentposition, parking.node, graphWeightProvider, true, -300000, true, vhc.config);
+    if (path != nil) {
+        gmc.setPath(path);
+    }
+}
+    
+#spawn service point for aircraft. Aircraft might be an AI, the main or GS aircraft. 
 var spawnService = func(aircraft) {
+    logger.info("spawning service point for aircraft");
     var positionXY = projection.project(aircraft.coord);
     var aircraftconfig = getAircraftConfiguration(aircraft.type);
     var sp = ServicePoint.new(groundnet, aircraft, buildFromVector2(positionXY), aircraft.heading, aircraftconfig);                               
@@ -515,7 +602,8 @@ var initProperties = func() {
     maxservicepointsNode = initNode("maxservicepoints", getNodeValue(simaigroundservicesN,"config/maxservicepoints",1), "INT");
     cateringdurationNode = initNode("cateringduration", getNodeValue(simaigroundservicesN,"config/cateringduration",1), "INT");
     fuelingdurationNode = initNode("fuelingduration", getNodeValue(simaigroundservicesN,"config/fuelingduration",1), "INT");
-                
+    delayfornearbyaircraftNode = initNode("delayfornearbyaircraft", getNodeValue(simaigroundservicesN,"config/delayfornearbyaircraft",""), "STRING");
+                    
     schedulesN = props.globals.getNode(PROPGROUNDSERVICES~"/schedules",1);
     servicepointsN = props.globals.getNode(PROPGROUNDSERVICES~"/servicepoints",1);
     maprangeNode = initNode("maprange", 0.7, "DOUBLE");
@@ -556,14 +644,15 @@ var wakeup = func() {
             offset -= automoveinterval;
         }
     }
-    	            
+
+    delayfornearbyaircraftlist = split(",",delayfornearbyaircraftNode.getValue());
     #give AI aircrafts 15 seconds for settling
     lastcheckforaircraft = systime();
     checkforaircraftinterval = 15;
     activetimestamp = systime();
     logging.info("Going active");
     statusNode.setValue("active");
-    #openMap();        
+    eventqueue = [];   
 };
 
 

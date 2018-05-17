@@ -56,7 +56,7 @@
             var idx = 0;
             
             foreach (var t; k) {
-            combo.getChild("value", idx, 1).setValue(groundservices.arrivedaircraft[t].callsign ~ "-" ~ groundservices.arrivedaircraft[t].nearparkpos);
+            combo.getChild("value", idx, 1).setValue(groundservices.arrivedaircraft[t].callsign ~ "-" ~ groundservices.arrivedaircraft[t].nearbyparkpos);
             idx += 1;
             }
             }

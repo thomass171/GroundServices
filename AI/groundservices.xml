@@ -18,6 +18,7 @@
         <!--service duration in seconds. is unrealistic short for now for having more activity-->
         <cateringduration>90</cateringduration>
         <fuelingduration>120</fuelingduration>
+        <delayfornearbyaircraft>15,30</delayfornearbyaircraft>
     </config>
     <vehicle>
         <name>Goldhofert</name>
@@ -64,6 +65,7 @@
         <name></name>
         <type>aircraft</type>
         <model>AI/Aircraft/737/737-AirCanada.xml</model>
+        <modeltype>737</modeltype>
         <initialcount>1</initialcount>
         <!-- 42 kmh-->
         <maximumspeed>11.7</maximumspeed>
@@ -76,6 +78,7 @@
         <name></name>
         <type>aircraft</type>
         <model>AI/Aircraft/737/737-AirFrance.xml</model>
+        <modeltype>737</modeltype>
         <initialcount>1</initialcount>
         <!-- 42 kmh-->
         <maximumspeed>11.7</maximumspeed>

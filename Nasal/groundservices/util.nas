@@ -284,7 +284,7 @@ var collectAllArrivedAircraftWithinRadius = func(radius) {
                     logging.debug("found non moving AI " ~ callsign ~ " of type " ~ type ~ ",heading="~heading);
                     var aircraft = buildArrivedAircraft( aN, coord, type, callsign, heading, id);
                     arrivedaircraft[id] = aircraft;
-                    logging.info("found arrived aircraft needing service: " ~ aircraft.callsign ~ " near parkpos " ~ aircraft.nearparkpos);                    
+                    logging.info("found arrived aircraft needing service: " ~ aircraft.callsign ~ " near parkpos " ~ aircraft.nearbyparkpos);                    
                 }
             }
         }
@@ -292,17 +292,29 @@ var collectAllArrivedAircraftWithinRadius = func(radius) {
 }
 
 var buildArrivedAircraft = func(node, coord, type, callsign, heading, id) {
-    var nearparkpos = "-";
-    
-    if (groundnet != nil) {
-        var parking = groundnet.getParkPosNearCoordinates(coord);
-        if (parking != nil){
-            nearparkpos = parking.name;
-        }
+    var nearbyparkpos = "-";
+    var nearbyparking = getNearbyParking(coord);
+    if (nearbyparking != nil) {
+        nearbyparkpos = nearbyparking.name;
     } else {
         logging.warn("arrived aircraft but no groundnet. possible inconsistency");        
     }
-    return {node : node, coord : coord, type : type, callsign : callsign, heading: heading, nearparkpos : nearparkpos, receivingservice: 0, id: id};
+    return {node : node, coord : coord, type : type, callsign : callsign, heading: heading, nearbyparkpos : nearbyparkpos, receivingservice: 0, id: id};
+}
+
+# Returns Parking object in case of success, nil in case of no available park pos
+#
+var getNearbyParking = func(coord) {    
+    if (groundnet != nil) {
+        var parkinglist = groundnet.getParkPosNearCoordinates(coord);
+        if (size(parkinglist) > 0) {
+            var parking = parkinglist[0].customdata;            
+            return parking;
+        }
+    } else {
+        logging.warn("No nearby parking due to no groundnet. possible inconsistency");        
+    }
+    return nil;
 }
 
 # check for empty string
@@ -364,6 +376,18 @@ var cloneCoord = func(coord) {
     var c = geo.Coord.new().set_latlon(coord.lat(),coord.lon());    
     c.set_alt(coord.alt());
     return c;   
+}
+
+var sendEvent = func(event) {
+    append(eventqueue,event);
+}
+
+# outside position to the southwest/northeast position (just arbitrary).
+var lastoutsideindex = 0;
+var getOutside = func() {
+    var outside = cloneCoord(center).apply_course_distance(225+90*lastoutsideindex, 25000);
+    lastoutsideindex += 1;
+    return outside;
 }
 
 logging.debug("completed util.nas");

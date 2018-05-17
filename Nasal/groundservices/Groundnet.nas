@@ -117,6 +117,7 @@ var Groundnet = {
 	    if (alt > me.maxaltitude) {
             me.maxaltitude = alt;
         }
+        #logger.debug("registerAltitude: "~alt);
 	},
 	
 	updateAltitudes: func() {
@@ -197,24 +198,30 @@ var Groundnet = {
         return nil;
     },
 
-    # get park pos closest to coordinates. Returns Parking customdata
+    # get park pos closest to coordinates. Returns list of GraphNode (formerly Parking object from customdata) sorted descending by distance.
     getParkPosNearCoordinates: func(coord) {
-        var shortestdistance = FloatMAX_VALUE;
-        var best = nil;
+        var list = [];
+    
         for (i = 0; i < me.groundnetgraph.getNodeCount(); i=i+1) {
             n = me.groundnetgraph.getNode(i);
             if (me.isParking(n)) {
-                var distance = n.coord.distance_to(coord);            
-                if (distance < shortestdistance) {
-                    shortestdistance = distance;
-                    best = n;
-                }
+                append(list,n);
             }
         }
-        if (best == nil) {
-            logging.warn("no best found");
+        list = sort(list, func(a,b) {
+              var distancea = a.coord.distance_to(coord);
+              var distanceb = b.coord.distance_to(coord);  
+              if (distancea < distanceb) return -1;
+              if (distancea > distanceb) return 1;
+              return 0;        
+        });
+        
+        if (size(list) == 0) {
+            logging.warn("no nearby parkpos found");
+        } else {
+            logger.debug("Closest parking node is " ~ list[0].name ~ " aka " ~ list[0].customdata.name);
         }
-        return best.customdata;
+        return list;
     },
     
     isParking: func(n){    
@@ -473,7 +480,7 @@ var Parking = {
             #logging.debug(""~e.getName()~" :true edgeheading="~edgeheading~", parkingheading="~me.heading);
             # large rounding errors might occur, so epsilon is "large".
             #if (isEqual(me.heading, edgeheading,0.1)) {
-            if (isEqual(me.heading, edgeheading,1)) {
+            if (isEqualDegree(me.heading, edgeheading,1)) {
                 return e;
             }
         }
@@ -483,7 +490,7 @@ var Parking = {
             #logging.debug(""~e.getName()~" :edgeheading="~edgeheading~", parkingheading="~me.heading);
             # large rounding errors might occur, so epsilon is "large".
             #if (isEqual(me.heading, edgeheading,0.1)) {
-            if (isEqual(me.heading, edgeheading,1)) {
+            if (isEqualDegree(me.heading, edgeheading,1)) {
                 return e;
             }
         }
