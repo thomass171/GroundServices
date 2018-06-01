@@ -1,9 +1,10 @@
 #!/bin/sh
 #
 # Build release package. Now builds package from git.
+# After uploading a release to Github the RELEASE should be increased to the next or some rc.
 #
 #
-RELEASE=0.4.0
+RELEASE=0.5.0
 #`date "+%Y%m%d%H%M"`
 DESTFILE=GroundServices-$RELEASE
 

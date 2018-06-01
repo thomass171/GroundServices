@@ -125,7 +125,7 @@
     </airports>
     <!-- aircraft special coordinates. Might need to be merged with AI door positions some time-->
     <aircraft>
-        <type>747-400</type>
+        <type>747*</type>
         <wingspread>64.4</wingspread>
         <wingpassingpoint>
             <x>-3</x>
@@ -143,7 +143,7 @@
         </door>
     </aircraft>
     <aircraft>
-        <type>738</type>
+        <type>738*,737*</type>
         <wingspread>35.79</wingspread>
         <wingpassingpoint>
             <x>4</x>

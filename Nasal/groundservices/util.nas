@@ -261,6 +261,13 @@ var getAircraftHeading = func() {
     return course;
 }
 
+var getAircraftType = func() {
+    var type = getprop("/sim/aircraft");
+    if (type == nil) {
+        type = "737";
+    }
+    return type;
+}
 
 #
 # check all AI aircrafts that are nearby and which are not moving

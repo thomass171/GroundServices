@@ -433,15 +433,19 @@ var Schedule = {
 var getAircraftConfiguration = func(type) {
     var node738 = nil;
     foreach (var aircraft_node;simaigroundservicesN.getChildren("aircraft")){
-        if (getChildNodeValue(aircraft_node,"type","") == type) {
-            logging.debug("found aircraft type "~type);        
-            return GroundServiceAircraftConfig.new (aircraft_node);
-        }
-        if (getChildNodeValue(aircraft_node,"type","") == "738") {
-            node738 = aircraft_node;
+        var acceptedtypes = split(",",getChildNodeValue(aircraft_node,"type",""));
+        foreach (var acceptedtype; acceptedtypes) {
+            # Bug in match(?). Append XX as workaround
+            if (string.match(type~"XX",acceptedtype)) {
+                logging.info("found aircraft type " ~ acceptedtype ~ " for " ~ type);        
+                return GroundServiceAircraftConfig.new (aircraft_node);
+            }        
+            if (acceptedtype == "738*") {
+                node738 = aircraft_node;
+            }
         }    
     }
-    logging.debug("aircraft type "~type~" not found.");
+    logging.warn("aircraft type "~type~" not found.");
     if (node738 != nil) {                        
         logging.debug("Using 738 as default.");
         return GroundServiceAircraftConfig.new (node738);

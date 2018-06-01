@@ -327,7 +327,7 @@ var Groundnet = {
     getLaneInfo: func(vehicleConfig) {
         var laneinfo = nil;
         if (me.multilaneenabled and (vehicleConfig == nil or vehicleConfig.type != VEHICLE_AIRCRAFT)) {
-            laneinfo = {offset : 7};
+            laneinfo = {offset : 12};
         }
         return laneinfo;
     },

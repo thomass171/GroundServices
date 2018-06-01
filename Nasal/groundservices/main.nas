@@ -212,7 +212,7 @@ var requestMove = func(vehicletype, parkposname) {
 var requestService = func(aircraftlabel = nil, parkpos = nil) {
     if (parkpos == nil and aircraftlabel == nil) {
         logging.debug("requestService for me");            
-        var myaircraft =  buildArrivedAircraft(nil, getAircraftPosition(), "737", "callsign", getAircraftHeading(),-1); 
+        var myaircraft =  buildArrivedAircraft(nil, getAircraftPosition(), getAircraftType(), "callsign", getAircraftHeading(),-1); 
         spawnService(myaircraft);
     } else {
         if (aircraftlabel == nil) {
