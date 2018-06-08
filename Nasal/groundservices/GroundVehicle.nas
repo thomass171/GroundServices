@@ -65,7 +65,8 @@ var GroundVehicle = {
         }
 		
 		# link nodes from current "/ai/models/gsvehicle" to corresponding "/models/model[]" entry                
-		
+		# avoid model collisions by disabling "enable-hot"
+        m.model.getNode("enable-hot", 1).setValue(0);
 		m.model.getNode("path", 1).setValue(modelpath);
 		m.model.getNode("latitude-deg-prop", 1).setValue(m.latN.getPath());
 		m.model.getNode("longitude-deg-prop", 1).setValue(m.lonN.getPath());

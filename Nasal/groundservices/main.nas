@@ -504,6 +504,7 @@ var spawnService = func(aircraft) {
 
 
 #might return lastdestination if no other is found. try 10 times to get other than last destination.
+#Returns a GraphNode object.
 var getNextDestination = func(lastdestination) {
     var destination = nil;
     for (var cnt=0;cnt<10;cnt+=1) {
@@ -532,8 +533,12 @@ var getNextDestination = func(lastdestination) {
                 }
             }
         }
-        #TODO temprary node
-        if (destination != lastdestination) {        
+        # avoid current aircrafts position as destination for avoiding visual collision of models.
+        var coor = getAircraftPosition();
+        var destinationcoor = projection.unproject(destination.locationXYZ);
+        var distance = destinationcoor.distance_to(coor);
+        
+        if (destination != lastdestination and distance > 10) {        
             return destination;
         }
     }       
