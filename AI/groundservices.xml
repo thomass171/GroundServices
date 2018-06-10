@@ -20,7 +20,8 @@
         <!--service duration in seconds. is unrealistic short for now for having more activity-->
         <cateringduration>90</cateringduration>
         <fuelingduration>120</fuelingduration>
-        <delayfornearbyaircraft>15,30</delayfornearbyaircraft>
+        <!-- increased form 15,30 to 45,60 for giving AI aircraft time to settle-->
+        <delayfornearbyaircraft>45,60</delayfornearbyaircraft>
     </config>
     <vehicle>
         <name>Goldhofert</name>
