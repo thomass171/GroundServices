@@ -217,14 +217,14 @@ var testServicePoint747_B2 = func() {
     # groundnet ist multilane now. Path back from door.
     path = sp.getDoorReturnPath(false);
     # rounding problem toOutline1(25)/toOutline1(26)?
-    TestUtil.assertEquals("path", "[back on smootharc]ex:e->toOutline1(26)->toOutline2(16)->toOutline3(16)->toOutline4(95)->toOutline5(22)->toOutline6(164)->toOutline7(87)->toOutline8(25)->reenter(63)->last(28)", path.toString());
+    TestUtil.assertEquals("path", "[back on smootharc]ex:e->toOutline1(26)->toOutline2(16)->toOutline3(16)->toOutline4(91)->toOutline5(18)->toOutline6(161)->toOutline7(83)->toOutline8(28)->reenter(66)->last(28)", path.toString());
     groundnet.groundnetgraph.removeLayer(path.layer);
     # per multilane from A20 (1-201) to door. turnloop must fit to outline 
     start = GraphPosition.new(edge1_201,edge1_201.getLength(),true);
     path = sp.getApproach(start, sp.doorEdge.from, false);
     # rounding problem reenter(25)/reenter(26)?
-    TestUtil.assertEquals("path", "1:e1->turnloop.smootharc(17)->e2(20)->toOutline1(29)->toOutline2(55)->toOutline3(17)->toOutline4(96)->toOutline5(173)->toOutline6(33)->toOutline7(106)->toOutline8(16)->toOutline9(16)->reenter(26)->last(16)", path.toString());
-    TestUtil.assertEquals("path", "1:e1--ex-->turnloop.smootharc(17)--ex-->e2(20)--1-->toOutline1(29)--outline1@63-->toOutline2(55)--outline2@69-->toOutline3(17)--outline3@68-->toOutline4(96)--outline4@129-->toOutline5(173)--outline5@130-->toOutline6(33)--outline6@131-->toOutline7(106)--outline7@101-->toOutline8(16)--outline8@wing1-->toOutline9(16)--outline9@wing0-->reenter(26)--door1-->last(16)", path.getDetailedString());
+    TestUtil.assertEquals("path", "1:e1->turnloop.smootharc(24)->e2(20)->toOutline1(31)->toOutline2(52)->toOutline3(15)->toOutline4(99)->toOutline5(176)->toOutline6(37)->toOutline7(110)->toOutline8(16)->toOutline9(16)->reenter(26)->last(16)", path.toString());
+    TestUtil.assertEquals("path", "1:e1--ex-->turnloop.smootharc(24)--ex-->e2(20)--1-->toOutline1(31)--outline1@63-->toOutline2(52)--outline2@69-->toOutline3(15)--outline3@68-->toOutline4(99)--outline4@129-->toOutline5(176)--outline5@130-->toOutline6(37)--outline6@131-->toOutline7(110)--outline7@101-->toOutline8(16)--outline8@wing1-->toOutline9(16)--outline9@wing0-->reenter(26)--door1-->last(16)", path.getDetailedString());
     groundnet.groundnetgraph.removeLayer(path.layer);
     
     sp.delete();
@@ -246,13 +246,13 @@ var testUturnA20ServicePoint747_B2 = func(groundnet, sp) {
     logger.debug("path="~path.toString());
     var segToOutline2at69 = path.getSegment(4);
     # values plausible at 69
-    TestUtil.assertVector3("outline at 69", Vector3.new(-1748,1116,virtualtestingaltitude),segToOutline2at69.getLeaveNode().getLocation(),1);
+    TestUtil.assertVector3("outline at 69", Vector3.new(-1746,1111,virtualtestingaltitude),segToOutline2at69.getLeaveNode().getLocation(),1);
     var segToOutlineat129 = path.getSegment(6);
     # values plausible at 129.
-    TestUtil.assertVector3("outline at 129", Vector3.new(-1640,1083,virtualtestingaltitude),segToOutlineat129.getLeaveNode().getLocation(),1);
+    TestUtil.assertVector3("outline at 129", Vector3.new(-1638,1078,virtualtestingaltitude),segToOutlineat129.getLeaveNode().getLocation(),1);
     var segToOutlineat131 = path.getSegment(8);
     # values plausible at 131
-    TestUtil.assertVector3("outline at 131", Vector3.new(-1547,1266,virtualtestingaltitude),segToOutlineat131.getLeaveNode().getLocation(),1);
+    TestUtil.assertVector3("outline at 131", Vector3.new(-1542,1268,virtualtestingaltitude),segToOutlineat131.getLeaveNode().getLocation(),1);
     groundnet.groundnetgraph.removeLayer(path.layer);
 
     path = sp.getApproach(start, sp.doorEdge.from, true);

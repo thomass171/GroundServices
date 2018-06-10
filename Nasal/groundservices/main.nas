@@ -289,7 +289,7 @@ var update = func() {
                 #requestService(event.vehicle);
                 #TODO modeltyper 737 
                 var virtualaircraft = buildArrivedAircraft(nil, closestparking.coord, "737", "--", closestparking.customdata.heading,0);
-                spawnService(virtualaircraft);
+                spawnService(virtualaircraft, " for aircraft completing its moving path");
             }
         } elsif (event.type == 5666) {
         }
@@ -482,8 +482,8 @@ var spawnMovingAircraft = func(vehicle, parking, startposition) {
 }
     
 #spawn service point for aircraft. Aircraft might be an AI, the main or GS aircraft. 
-var spawnService = func(aircraft) {
-    logger.info("spawning service point for aircraft");
+var spawnService = func(aircraft, comment="") {
+    logger.info("spawning service point for aircraft"~comment);
     var positionXY = projection.project(aircraft.coord);
     var aircraftconfig = getAircraftConfiguration(aircraft.type);
     var sp = ServicePoint.new(groundnet, aircraft, buildFromVector2(positionXY), aircraft.heading, aircraftconfig);                               

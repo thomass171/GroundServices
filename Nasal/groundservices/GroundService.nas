@@ -437,7 +437,7 @@ var getAircraftConfiguration = func(type) {
         foreach (var acceptedtype; acceptedtypes) {
             # Bug in match(?). Append XX as workaround
             if (string.match(type~"XX",acceptedtype)) {
-                logging.info("found aircraft type " ~ acceptedtype ~ " for " ~ type);        
+                logging.debug("found aircraft type " ~ acceptedtype ~ " for " ~ type);        
                 return GroundServiceAircraftConfig.new (aircraft_node);
             }        
             if (acceptedtype == "738*") {

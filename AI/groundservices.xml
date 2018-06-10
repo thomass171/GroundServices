@@ -4,6 +4,8 @@
 
     <!--
         properties go to /sim/ai/groundservices
+        The number of ground vehicles of each type (initialcount) is scaled by the airport groundnets size.
+        A small airport like EDDG should have 2 catering and fuel trucks. 
     -->
     <config>
         <!--should vehicles start moving around on their own without being requested-->

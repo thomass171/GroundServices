@@ -273,7 +273,7 @@ var getAircraftType = func() {
 # check all AI aircrafts that are nearby and which are not moving
 #
 var collectAllArrivedAircraftWithinRadius = func(radius) {
-    logging.info("collecting arrived aircraft in range of "~radius);    
+    logging.info("collecting arrived aircraft in range of "~radius~ "m from current aircraft");    
     var center = getAircraftPosition();
     var aiaircrafts = props.globals.getNode("/ai/models/", 1).getChildren("aircraft");
     var idx = 0;
