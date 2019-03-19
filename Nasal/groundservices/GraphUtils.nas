@@ -414,7 +414,11 @@ var createPathFromGraphPositionAndPath = func (graph, path, nextnode, from, to, 
                 # no smooth transition
                 smoothedpath.addSegment(segment);
             } else {            
-                smoothedpath.replaceLast(transition);
+                # 13.3.19: Avoid inconsistent GraphPaths, eg EDDK at "B2->Home" with multilane.
+                if (!smoothedpath.replaceLast(transition)) {
+                    logger.error("inconsistent transition found and ignored");
+                    smoothedpath.addSegment(segment);
+                }
             }
         } else {
             # no smoothing
@@ -423,6 +427,11 @@ var createPathFromGraphPositionAndPath = func (graph, path, nextnode, from, to, 
     }
     if (graphutilsdebuglog) {
         logger.debug("smoothed path: " ~ ((smoothedpath==nil)?"nil":smoothedpath.toString()));
+    }
+    # 13.3.19: Report inconsistent GraphPaths
+    var msg = smoothedpath.validate();
+    if (msg != nil) {
+        logger.warn("returning inconsistent path: "~msg);
     }
     return smoothedpath;       
 };

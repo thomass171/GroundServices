@@ -670,19 +670,26 @@ var GraphPath = {
         }
         return s;
     },
-    
+
+    # Returns true if segment was replaced, false otherwise.
     replaceLast: func( transition) {
-        #var index = size(me.path) - 1;
-        #me.path[index] = transition.seg[0];        
-        #for (var i=1;i<size(transition.seg);i+=1) {
-        #    append(me.path,transition.seg[i]);
-        #}
+        var currseg = nil;
+        if (size(me.path) > 1) {
+            currseg = me.path[size(me.path) - 2];
+        }
+        foreach (var s ; transition.seg) {
+            if (currseg != nil and !me.isConnectedToPredecessor(s, currseg)) {
+                return false;
+            }
+            currseg = s;
+        }
         if (size(me.path) > 0) {
             me.path = removeFromList(me.path,size(me.path) - 1);        
         }
         foreach (var s ; transition.seg) {
             append(me.path,s);
         }
+        return true;
     },
     
     getLength: func(currentposition) {
@@ -705,7 +712,23 @@ var GraphPath = {
     getDetailedString: func () {
         return me.toString(true);
     },
-        
+
+    validate: func () {
+        for (var i = 1; i < size(me.path); i=i+1) {
+            var seg = me.path[i];
+            var pre = me.path[i - 1];
+            if (!me.isConnectedToPredecessor(seg, pre)) {
+                logger.error("unconnected enter node");
+                return "unconnected enter node";
+            }
+        }
+        return nil;
+    },
+
+    isConnectedToPredecessor: func (seg, predecessor) {
+        return seg.enternode.equals(predecessor.edge.getFrom()) or seg.enternode.equals(predecessor.edge.getTo());
+    },
+
     validateAltitude: func() {
         for (var i = 0; i<me.getSegmentCount() ; i=i+1) {
             var e = me.getSegment(i).edge;

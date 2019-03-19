@@ -31,6 +31,9 @@ var del = func() {
 
 var searchCmd = func {
 	var edges = [];
+	if (groundservices.groundnet == nil) {
+	    return edges;
+	}
 	foreach (var edge; groundservices.groundnet.groundnetgraph.edges) {
         if (edge.getLayer()==0) {
             var coords = [];
