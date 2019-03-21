@@ -50,7 +50,6 @@ var cateringdurationNode = nil;
 var maxservicepointsNode = nil;
 var simaigroundservicesN = nil;
 var autoserviceNode = nil;
-var schedulesN = nil;
 var servicepointsN = nil;
 var maprangeNode = nil;
 var delayfornearbyaircraftNode = nil;
@@ -65,8 +64,6 @@ var homename = nil;
 var destinationlist = nil;
 #hash of service points (id is key)
 var servicepoints = {};
-#hash of active schedules (id is key)
-var schedules = {};
 var scenario = 1;
 var scalefactor = 1;
 var maxservicepoints = 1;
@@ -244,7 +241,7 @@ var requestService = func(aircraftlabel = nil, parkpos = nil) {
 var requestArrivingAircraft = func(destination) {
     #var launchedge = groundnet.groundnetgraph.findEdgeByName("89-90");
     #var start = GraphPosition.new(launchedge);
-    var vlist = findAvailableVehicles(VEHICLE_AIRCRAFT);
+    var vlist = findAvailableVehicles(VEHICLE_AIRCRAFT,nil);
     foreach(var aircraft; vlist) {
         # avoid non airliner
         if (aircraft.vhc.config.modeltype == "737") {
@@ -290,6 +287,14 @@ var update = func() {
                 #TODO modeltyper 737 
                 var virtualaircraft = buildArrivedAircraft(nil, closestparking.coord, "737", "--", closestparking.customdata.heading,0);
                 spawnService(virtualaircraft, " for aircraft completing its moving path");
+            }
+            var gsc = event.vehicle.gsc;
+            if (gsc != nil) {
+                #vehicle reached service point?
+                #gsc makes sure this isn't the "vehicle returned home" event.
+                if (gsc.isApproaching()) {
+                    gsc.startService();
+                }
             }
         } elsif (event.type == 5666) {
         }
@@ -346,37 +351,7 @@ var update = func() {
                 }
             }                                  
         }
-        
-        var skeys = keys(schedules);              
-        for (var i = size(skeys) - 1; i >= 0; i=i-1) {        
-            var s = schedules[skeys[i]];
-            # progress actions of schedule
-            for (var j = size(s.actions) - 1; j >= 0; j=j-1) {
-                var a = s.actions[j];
-                if (a.isActive() and a.checkCompletion()) {
-                    #actionsactive.remove(j);
-                    #s.actions[j] = nil;
-                }
-            }
-            var action = s.next();
-            if (action != nil) {
-                action.trigger();            
-            }
-            if (s.checkCompletion()) {
-                logging.info(s.toString() ~ " completed.");
-                s.delete();            
-            }
-        }
-        
-        # check for completed SPs
-        skeys = keys(servicepoints);
-        for (var i = size(skeys) - 1; i >= 0; i=i-1) {
-            var sp = servicepoints[skeys[i]];
-            if (sp.cateringschedule.isCompleted() and sp.fuelschedule.isCompleted()) {
-                sp.delete();                
-            }
-        }
-                
+
         # individual service scenarios
         if (size(arrivedaircraft) > 2 and scenario == 0){
             requestService("C_4");
@@ -404,7 +379,8 @@ var update = func() {
     foreach (var v; values(GroundVehicle.active)) {
         var gmc = v.gmc;
         var vhc = v.vhc;
-        
+        var gsc = v.gsc;
+
 		v.update(deltatime);
         
         # check for completed movment
@@ -416,11 +392,16 @@ var update = func() {
 
         if (automoveNode.getValue()) {                    
             #spawn moving for idle vehicles to random destination
-            if (gmc.unscheduledmoving and expiredIdle(gmc,vhc,maxidletime) and !vhc.isScheduled()) {             
+            if (gmc.unscheduledmoving and expiredIdle(gmc,vhc,gsc,maxidletime)) {
                 vhc.lastdestination = getNextDestination(vhc.lastdestination);
                 logging.debug("Spawning move to " ~ vhc.lastdestination.getName());                
                 spawnMoving(v, vhc.lastdestination);
             }
+        }
+        if (gsc.serviceCompleted()) {
+            var sp = gsc.sp;
+            returnVehicle(v, gsc);
+            sp.delete();
         }
     }
     
@@ -431,9 +412,9 @@ var update = func() {
     settimer(func update(), 0);
 }
 
-var expiredIdle = func(gmc,vhc,maxidletime) {
+var expiredIdle = func(gmc,vhc,gsc,maxidletime) {
 	#logging.debug("currentstate is "~me.state);
-	if (!vhc.isIdle()) {
+	if (!gsc.isIdle()) {
         return 0;
     }
     if (gmc.isMoving() != nil) {
@@ -484,24 +465,18 @@ var spawnMovingAircraft = func(vehicle, parking, startposition) {
 #spawn service point for aircraft. Aircraft might be an AI, the main or GS aircraft. 
 var spawnService = func(aircraft, comment="") {
     logger.info("spawning service point for aircraft"~comment);
-    var positionXY = projection.project(aircraft.coord);
-    var aircraftconfig = getAircraftConfiguration(aircraft.type);
-    var sp = ServicePoint.new(groundnet, aircraft, buildFromVector2(positionXY), aircraft.heading, aircraftconfig);                               
-    servicepoints[sp.node.getValue("id")] = sp;
-    var schedule = Schedule.new(sp, groundnet);
-    schedule.addAction(VehicleOrderAction.new(schedule, VEHICLE_CATERING, sp.doorEdge.from));
-    schedule.addAction(VehicleServiceAction.new(schedule,cateringdurationNode.getValue()));
-    schedule.addAction(VehicleReturnAction.new(schedule, 1,sp,1));
-    addSchedule(schedule);
-    sp.cateringschedule = schedule;
-    schedule = Schedule.new(sp, groundnet);
-    schedule.addAction(VehicleOrderAction.new(schedule, VEHICLE_FUELTRUCK, sp.wingedge.to));
-    schedule.addAction(VehicleServiceAction.new(schedule,fuelingdurationNode.getValue()));
-    schedule.addAction(VehicleReturnAction.new(schedule, 0,sp,0));
-    addSchedule(schedule);
-    sp.fuelschedule = schedule;
+    spawnSingleService(aircraft, VEHICLE_CATERING, cateringdurationNode.getValue());
+    spawnSingleService(aircraft, VEHICLE_FUELTRUCK, fuelingdurationNode.getValue());
 }
 
+var spawnSingleService = func(aircraft, servicetype, servicedurationinseconds) {
+    var positionXY = projection.project(aircraft.coord);
+    var aircraftconfig = getAircraftConfiguration(aircraft.type);
+    var sp = ServicePoint.new(groundnet, aircraft, buildFromVector2(positionXY), aircraft.heading, aircraftconfig);
+    servicepoints[sp.node.getValue("id")] = sp;
+    # if service fails, sp will be deleted
+    launchServiceVehicle(servicetype, groundnet, sp,servicedurationinseconds);
+}
 
 #might return lastdestination if no other is found. try 10 times to get other than last destination.
 #Returns a GraphNode object.
@@ -546,6 +521,7 @@ var getNextDestination = func(lastdestination) {
 };
         
 var shutdown = func() {
+    logger.info("shutdown");
     #remove existing stuff. TODO get rid off timer
     removeGroundnetModel();
     
@@ -556,15 +532,10 @@ var shutdown = func() {
     foreach (var v; values(GroundVehicle.active))
 		v.del();
 	
-	var skeys = keys(schedules);                              	
-    for (var i = size(skeys) - 1; i >= 0; i=i-1) {        
-        var s = schedules[skeys[i]];
-        s.delete();                    
-    }
-    skeys = keys(servicepoints);
+	var skeys = keys(servicepoints);
     for (var i = size(skeys) - 1; i >= 0; i=i-1) {
         var sp = servicepoints[skeys[i]];
-        sp.delete();                        
+        sp.delete();
     }
     arrivedaircraft = {};
     logging.info("shut down");
@@ -609,7 +580,6 @@ var initProperties = func() {
     fuelingdurationNode = initNode("fuelingduration", getNodeValue(simaigroundservicesN,"config/fuelingduration",1), "INT");
     delayfornearbyaircraftNode = initNode("delayfornearbyaircraft", getNodeValue(simaigroundservicesN,"config/delayfornearbyaircraft",""), "STRING");
                     
-    schedulesN = props.globals.getNode(PROPGROUNDSERVICES~"/schedules",1);
     servicepointsN = props.globals.getNode(PROPGROUNDSERVICES~"/servicepoints",1);
     maprangeNode = initNode("maprange", 0.7, "DOUBLE");
         

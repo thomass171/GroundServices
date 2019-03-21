@@ -11,7 +11,7 @@ var graphmovementdebuglog = 1;
 
 var GroundVehicle = {
 	new: func(model, gmc, maximumspeed, type, delay, zoffset, modeltype) {
-	    logging.debug("new GroundVehicle. model="~model);
+	    logging.debug("new GroundVehicle. model=" ~ model ~ ",type=" ~ type ~ ",modeltype=" ~ modeltype );
 		#props.globals.getNode("gear/gear[0]/wow", 1).setValue(1);
 		#props.globals.getNode("sim/model/pushback/enabled", 1).setValue(1);
 
@@ -55,6 +55,7 @@ var GroundVehicle = {
         
         m.vhc = VehicleComponent.new(type,m.aiid,modeltype);
         m.vc = VelocityComponent.new(maximumspeedN, speedN);
+        m.gsc = GroundServiceComponent.new(type,m.aiid,modeltype);
 
 		#m.update();
 		
@@ -200,7 +201,7 @@ var GroundVehicle = {
 		#var qual = diff > 3000 ? " well" : abs(diff) > 1000 ? " slightly" : "";
 		#var rel = diff > 1000 ? " above" : diff < -1000 ? " below" : "";
 		var statemsg = "idle";
-		if (me.vhc.isScheduled()) {
+		if (!me.gsc.isIdle()) {
 		    statemsg = "busy";
 		}
 		if (me.gmc.isMoving() != nil) {
@@ -400,6 +401,8 @@ var MOVING = "moving";
 var BUSY = "busy";
 
 var VEHICLE_AIRCRAFT = "aircraft";
+var VEHICLE_CAR = "car";
+
 var VEHICLE_PUSHBACK = "pushback";
 var VEHICLE_STAIRS = "stairs";
 var VEHICLE_FUELTRUCK = "fueltruck";
@@ -416,18 +419,13 @@ var VehicleComponent = {
 	    #obj.path = nil;
 	    obj.aiid = aiid;
 	    obj.createtimestamp = systime();
-	    obj.schedule = nil;
 	    obj.config = {type:type,modeltype:modeltype};
 		return obj;
 	},
 		    
-    isScheduled: func() {
-        return me.schedule != nil;
-    },
+
     
-    isIdle: func() {
-        return me.schedule == nil;
-    }, 	
+
 };
 
 var VelocityComponent = {
@@ -489,14 +487,88 @@ var VelocityComponent = {
     },
 };
 
+var GroundServiceComponent = {
+
+    new: func(type,aiid,modeltype) {
+	    var obj = { parents: [GroundServiceComponent] };
+	    obj.statechangetimestamp = 0;
+	    obj.servicestarttimestamp = 0;
+	    obj.aiid = aiid;
+	    obj.createtimestamp = systime();
+	    obj.sp = nil;
+	    obj.config = {type:type,modeltype:modeltype};
+	    obj.fordoor = 0;
+	    obj.durationinseconds = 0;
+		return obj;
+	},
+
+    setStateApproaching: func(sp, modeltype, servicedurationinseconds) {
+        me.sp = sp;
+        me.statechangetimestamp = systime();
+        me.durationinseconds = servicedurationinseconds;
+
+        if (modeltype == VEHICLE_FUELTRUCK) {
+            me.fordoor = false;
+            return sp.wingedge.to;
+        }
+        if (modeltype == VEHICLE_CATERING) {
+            me.fordoor = true;
+            return sp.doorEdge.from;
+        }
+        logger.warn("no preferred destination, using door: " ~ modeltype);
+        me.fordoor = true;
+        return sp.doorEdge.from;
+    },
+
+    setStateIdle: func() {
+        me.sp = nil;
+        me.statechangetimestamp = systime();
+        me.servicestarttimestamp = 0;
+    },
+
+    startService: func() {
+        logger.info("Starting service " ~ me.config.modeltype);
+        me.statechangetimestamp = systime();
+        me.servicestarttimestamp = systime();
+    },
+
+    isApproaching: func() {
+        return me.sp != nil and me.servicestarttimestamp == 0;
+    },
+
+    serviceCompleted: func() {
+        if (me.servicestarttimestamp > 0 and systime() > me.servicestarttimestamp + me.durationinseconds) {
+            logger.info("Service completed: " ~ me.config.modeltype);
+            return true;
+        }
+        return false;
+    },
+
+    reset: func() {
+        logger.debug("Resetting GroundServiceComponent");
+        me.servicestarttimestamp = 0;
+        if (me.sp != nil) {
+            me.sp.delete();
+        }
+        me.sp = nil;
+    },
+
+    isIdle: func() {
+        return me.sp == nil;
+    },
+};
+
 # Only return idle vehicles because moving ones cannot relocated (due to unknwon layer)
-var findAvailableVehicles = func(vehicletype) {
+var findAvailableVehicles = func(vehicletype, modeltype) {
     var list = [];
     foreach (var v; values(GroundVehicle.active)) {
         var vhc = v.vhc;
         var gmc = v.gmc;
-        if (vhc.type == vehicletype and vhc.isIdle() and gmc.isMoving() == nil) {
-            append(list,v);
+        var gsc = v.gsc;
+        if (vhc.config.type == vehicletype and gsc.isIdle() and gmc.isMoving() == nil) {
+            if (modeltype == nil or gsc.config.modeltype == modeltype) {
+                append(list,v);
+            }
         }
     }
     return list;

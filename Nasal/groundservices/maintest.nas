@@ -203,16 +203,7 @@ var testServicePoint747_B2 = func() {
     groundnet.groundnetgraph.removeLayer(path.layer);
     path = sp.getApproach(start, sp.wingedge.to, 0);
     groundnet.groundnetgraph.removeLayer(path.layer);
-    
-    var schedule = Schedule.new(sp, groundnet);
-    schedule.addAction(VehicleOrderAction.new(schedule, VEHICLE_CATERING, sp.doorEdge.from));
-    schedule.addAction(VehicleServiceAction.new(schedule,2));
-    schedule.addAction(VehicleReturnAction.new(schedule, 1,sp,1));
-    schedule = Schedule.new(sp, groundnet);
-    schedule.addAction(VehicleOrderAction.new(schedule, VEHICLE_FUELTRUCK, sp.wingedge.to));
-    schedule.addAction(VehicleServiceAction.new(schedule,2));
-    schedule.addAction(VehicleReturnAction.new(schedule, 0,sp,0));
-    
+
     testUturnA20ServicePoint747_B2(groundnet, sp);
     # groundnet ist multilane now. Path back from door.
     path = sp.getDoorReturnPath(false);
@@ -327,7 +318,7 @@ var maintest = func {
 };
 
 var cleanupTest = func() {
-    schedulesN.removeChildren("schedule");
+
 };
 
 # from props.dump

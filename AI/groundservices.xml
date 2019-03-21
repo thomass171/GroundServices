@@ -25,7 +25,8 @@
     </config>
     <vehicle>
         <name>Goldhofert</name>
-        <type>pushback</type>
+        <type>car</type>
+        <modeltype>pushback</modeltype>
         <model>Models/GroundServices/Goldhofert/Goldhofert.xml</model>
         <initialcount>3</initialcount>
         <!-- 42 kmh-->
@@ -35,7 +36,8 @@
 
     <vehicle>
         <name>FollowMe</name>
-        <type>followme</type>
+        <type>car</type>
+        <modeltype>followme</modeltype>
         <model>Models/GroundServices/Followme/followme.xml</model>
         <initialcount>3</initialcount>
         <!-- 77 kmh-->
@@ -45,7 +47,8 @@
 
     <vehicle>
         <name>Volvo Fuel Truck</name>
-        <type>fueltruck</type>
+        <type>car</type>
+        <modeltype>fueltruck</modeltype>
         <model>Models/GroundServices/FuelTruck/Fuel_Truck_Short_VolvoFM.xml</model>
         <initialcount>5</initialcount>
         <!-- 56 kmh-->
@@ -55,7 +58,8 @@
 
     <vehicle>
         <name>Catering Truck</name>
-        <type>catering</type>
+        <type>car</type>
+        <modeltype>catering</modeltype>
         <model>Models/GroundServices/Catering/catruckmed-lsg1.xml</model>
         <initialcount>5</initialcount>
         <!-- 63 kmh-->
@@ -67,6 +71,7 @@
     <vehicle>
         <name></name>
         <type>aircraft</type>
+        <modeltype>737</modeltype>
         <model>AI/Aircraft/737/737-AirCanada.xml</model>
         <modeltype>737</modeltype>
         <initialcount>1</initialcount>
@@ -80,6 +85,7 @@
     <vehicle>
         <name></name>
         <type>aircraft</type>
+        <modeltype>737</modeltype>
         <model>AI/Aircraft/737/737-AirFrance.xml</model>
         <modeltype>737</modeltype>
         <initialcount>1</initialcount>
@@ -94,6 +100,7 @@
     <vehicle>
         <name></name>
         <type>aircraft</type>
+        <modeltype></modeltype>
         <model>AI/Aircraft/Citation-Bravo/Models/Bravo-ai.xml</model>
         <initialcount>1</initialcount>
         <!-- 42 kmh-->
