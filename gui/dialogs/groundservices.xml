@@ -232,7 +232,30 @@
        
     </group>
     <hrule/>
-    
+
+    <group>
+        <layout>hbox</layout>
+        <text>
+            <halign>left</halign>
+            <label>Viewpoint:</label>
+        </text>
+
+        <button>
+            <legend>down</legend>
+            <binding>
+                <command>nasal</command>
+                <script>groundservices.cycleViewpoint(-1);</script>
+            </binding>
+        </button>
+        <button>
+            <legend>up</legend>
+            <binding>
+                <command>nasal</command>
+                <script>groundservices.cycleViewpoint(1);</script>
+            </binding>
+        </button>
+    </group>
+
     <!--
     <group>
         <layout>hbox</layout>

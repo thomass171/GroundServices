@@ -34,7 +34,7 @@ var del = func() {
 };
 
 var MapElement = {
-	new: func(id, posnode, type, categorie="i", layer=nil) {
+	new: func(id, posnode, type, categorie, layer=nil) {
 		var m = {
 			# Note: because this inherits from props.Node, Symbol.Controller.equals
 			# will call l.equals(r) -- the one defined below
@@ -45,10 +45,12 @@ var MapElement = {
 			type: type,
 			categorie: categorie,
 		};
-		#groundservices.logging.info("new MapElement: id="~m.id~", type="~m.type);
+		#groundservices.logging.info("new MapElement: id="~m.id~", type="~m.type~",categorie="~m.categorie);
 		return m;
 	},
-	equals: func(other) other.id == me.id,
+
+	equals: func(other) other.id == me.id and other.categorie == me.categorie,
+
 	latlon: func() { # this makes sure to look like a geo.Coord to MapStructure, but will internally use the AI/MP traffic properties instead
 	    #logging.debug("latlonalt:"~me.pos.getValue("latitude-deg")~" "~me.pos.getValue("longitude-deg")~" " ~me.pos.getValue("altitude-ft"));
 		return [
@@ -58,7 +60,7 @@ var MapElement = {
 		];
 	},
 	getCategorie: func() {
-	    return me.categorie;	
+	    return me.categorie;
 	},
 };
 
@@ -81,8 +83,19 @@ var searchCmd = func {
 			logging.warn("alert", "lat/lon was nil for AI node "~t.getPath());
 			continue;
 		}
+		var vehicle = groundservices.findVehicleById(t.getValue("id"));
 		var categorie = 'i';
-		append(result, MapElement.new(t.getValue("id"),t.getNode("position",1),t.getValue("type"), categorie, me.layer));        
+		var type = t.getValue("type");
+		if (type == groundservices.VEHICLE_CAR) {
+            if (!vehicle.gsc.isIdle()) {
+                categorie = 'b';
+            }
+		}
+		if (type == groundservices.VEHICLE_AIRCRAFT) {
+            categorie = 'A';
+        }
+        #groundservices.logging.debug("found vehicle. type="~type~",categorie="~categorie);
+		append(result, MapElement.new(t.getValue("id"),t.getNode("position",1),type, categorie, me.layer));
 	}
 	# sp id might be equal to vehicle id, so add 100000
 	foreach (var t; groundservices.servicepointsN.getChildren("servicepoint")) {

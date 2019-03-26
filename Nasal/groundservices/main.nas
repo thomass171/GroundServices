@@ -75,6 +75,7 @@ var delayfornearbyaircraftlist = [];
 
 var GRAPH_EVENT_PATHCOMPLETED = 1;
 var eventqueue = [];
+var currentviewpoint = -1;
 
 var report = func {
     #atc_msg("Ground Service Status: "~statusNode.getValue());
@@ -582,7 +583,8 @@ var initProperties = func() {
                     
     servicepointsN = props.globals.getNode(PROPGROUNDSERVICES~"/servicepoints",1);
     maprangeNode = initNode("maprange", 0.7, "DOUBLE");
-        
+
+    setViewpoint(props.globals.getNode("/"),1700);
 }
 
 #
@@ -623,6 +625,7 @@ var wakeup = func() {
     delayfornearbyaircraftlist = split(",",delayfornearbyaircraftNode.getValue());
     #give AI aircrafts 15 seconds for settling
     lastcheckforaircraft = systime();
+    setViewpoint(props.globals.getNode("/"),1700);
     checkforaircraftinterval = 15;
     activetimestamp = systime();
     logging.info("Going active");

@@ -56,6 +56,7 @@ var ServicePoint = {
         obj.node = servicepointsN.addChild("servicepoint");
         obj.node.getNode("position/latitude-deg", 1).setValue(aa.coord.lat());
         obj.node.getNode("position/longitude-deg", 1).setValue(aa.coord.lon());
+        obj.node.getNode("position/altitude-ft", 1).setValue(aa.coord.alt()*M2FT);
         obj.node.getNode("id",1).setValue(servicepointid);
         servicepointid += 1;
         

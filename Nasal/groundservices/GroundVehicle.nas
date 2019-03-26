@@ -573,6 +573,15 @@ var findAvailableVehicles = func(vehicletype, modeltype) {
     }
     return list;
 };
+
+var findVehicleById = func(id) {
+    foreach (var v; values(GroundVehicle.active)) {
+        if (v.aiid == id) {
+            return v;
+        }
+    }
+    return nil;
+};
     
 logging.debug("completed GroundVehicle.nas");
 

@@ -397,4 +397,33 @@ var getOutside = func() {
     return outside;
 }
 
+var setViewpoint = func(fromnode,altitudeoffset) {
+    var p = "/groundservices/viewpoint";
+    props.globals.getNode(p~"/position/longitude-deg", 1).setValue(fromnode.getNode("position/longitude-deg", 1).getValue());
+    props.globals.getNode(p~"/position/latitude-deg", 1).setValue(fromnode.getNode("position/latitude-deg", 1).getValue());
+    props.globals.getNode(p~"/position/altitude-ft", 1).setValue(fromnode.getNode("position/altitude-ft", 1).getValue()+altitudeoffset);
+
+    props.globals.getNode(p~"/orientation/heading-deg", 1).setValue(0);
+    props.globals.getNode(p~"/orientation/pitch-deg", 1).setValue(-90);
+    props.globals.getNode(p~"/orientation/roll-deg", 1).setValue(0);
+}
+
+var cycleViewpoint = func(inc) {
+    var sps = servicepointsN.getChildren("servicepoint");
+    if (size(sps) == 0) {
+        logger.debug("no servicepoint to view. Going to overview");
+        currentviewpoint = 0;
+        setViewpoint(props.globals.getNode("/"),1700);
+        return;
+    }
+    currentviewpoint += inc;
+    if (currentviewpoint < 0) {
+        currentviewpoint = size(sps) - 1;
+    }
+    if (currentviewpoint >= size(sps)) {
+        currentviewpoint = 0;
+    }
+    setViewpoint(sps[currentviewpoint],700);
+}
+
 logging.debug("completed util.nas");
