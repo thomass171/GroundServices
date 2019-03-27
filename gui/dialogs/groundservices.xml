@@ -255,73 +255,8 @@
             </binding>
         </button>
     </group>
-
-    <!--
-    <group>
-        <layout>hbox</layout>
-        <default-padding>1</default-padding>
-        <button>
-            <legend>Map</legend>
-            <binding>
-                <command>nasal</command>
-                <script>groundservices.openMap();</script>
-            </binding>
-        </button>
-        
-        <button>
-            <name>zoomout</name>
-            <legend>-</legend>
-            <pref-width>22</pref-width>
-            <pref-height>22</pref-height>
-
-            <binding>
-                <command>property-multiply</command>
-                <property>/groundservices/maprange</property>
-                <min>0</min>
-                <factor>0.5</factor>
-            </binding>
-        </button>
-
-        <text>
-            <label>MMMMMM</label>
-            <halign>center</halign>
-            <format>Range %4.2f</format>
-            <property>/groundservices/maprange</property>
-            <live>true</live>
-        </text>
-
-        <button>
-            <name>zoomin</name>
-            <legend>+</legend>
-            <pref-width>22</pref-width>
-            <pref-height>22</pref-height>
-
-            <binding>
-                <command>property-multiply</command>
-                <property>/groundservices/maprange</property>
-                <factor>2</factor>
-                <max>1024</max>
-            </binding>
-        </button>
--->
-        <!--useless view efforts. model+cockpit-view is used instead
-        <button>
-            <legend>View</legend>
-            <binding>
-                <command>nasal</command>
-                <script>groundservices.buildView();</script>
-            </binding>
-        </button>-->
-
-<!--        
-
-        <empty>
-            <stretch>true</stretch>
-        </empty>
-    </group>
--->
-    
     <hrule/>
+
     <group>
         <layout>hbox</layout>
         <default-padding>5</default-padding>

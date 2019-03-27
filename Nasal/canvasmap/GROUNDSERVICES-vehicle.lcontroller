@@ -1,6 +1,4 @@
 # derived from TFC layer
-# requires a patch to function aircraftpos.controller:update_quickly() for being updated regularly:
-#  	"GROUNDSERVICES-vehicle","TFC", "FLT", 
 #
 # Class things:
 var name = 'GROUNDSERVICES-vehicle';
