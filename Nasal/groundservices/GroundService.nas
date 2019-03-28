@@ -208,6 +208,9 @@ launchServiceVehicle = func(modeltype, groundnet, servicepoint,servicedurationin
         # avoid driving catering and fueltruck alongside by a 6 second delay
         vehicle.delay = 6;
     }
+    if (!vehicle.lock("GSS")) {
+        logger.error("Lock vehicle failed");
+    }
 }
 
 returnVehicle = func(vehicle, gsc) {

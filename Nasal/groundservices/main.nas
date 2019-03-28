@@ -246,8 +246,12 @@ var requestArrivingAircraft = func(destination) {
     foreach(var aircraft; vlist) {
         # avoid non airliner
         if (aircraft.vhc.config.modeltype == "737") {
-            spawnMovingAircraft(aircraft, destination, nil);
-            return;
+            if (spawnMovingAircraft(aircraft, destination, nil)) {
+                if (!aircraft.lock("AMS")) {
+                    logger.error("Lock aircraft failed");
+                }
+                return;
+            }
         }
     }
 }
@@ -277,6 +281,7 @@ var update = func() {
         if (event.type == GRAPH_EVENT_PATHCOMPLETED) {
             groundnet.groundnetgraph.removeLayer(event.path.layer);
             var vhc = event.vehicle.vhc;
+            var vehicle = event.vehicle;
             # if it is an aircraft and located on a parkos (and not willing to depart) request service.
             var gmc = event.vehicle.gmc;
             var positionXYZ = gmc.currentposition.get3DPosition();
@@ -289,13 +294,20 @@ var update = func() {
                 var virtualaircraft = buildArrivedAircraft(nil, closestparking.coord, "737", "--", closestparking.customdata.heading,0);
                 spawnService(virtualaircraft, " for aircraft completing its moving path");
             }
-            var gsc = event.vehicle.gsc;
+            var gsc = vehicle.gsc;
             if (gsc != nil) {
                 #vehicle reached service point?
                 #gsc makes sure this isn't the "vehicle returned home" event.
                 if (gsc.isApproaching()) {
                     gsc.startService();
                 }
+                if (gsc.sp == nil and vehicle.isLockedBy("GSS")) {
+                    #vehicle appears to be returned
+                    vehicle.release("GSS");
+                }
+            }
+            if (vehicle.isLockedBy("AMS")) {
+                vehicle.release("AMS");
             }
         } elsif (event.type == 5666) {
         }
@@ -393,10 +405,14 @@ var update = func() {
 
         if (automoveNode.getValue()) {                    
             #spawn moving for idle vehicles to random destination
-            if (gmc.unscheduledmoving and expiredIdle(gmc,vhc,gsc,maxidletime)) {
+            if (!v.isLocked() and gmc.unscheduledmoving and expiredIdle(gmc,vhc,gsc,maxidletime)) {
                 vhc.lastdestination = getNextDestination(vhc.lastdestination);
                 logging.debug("Spawning move to " ~ vhc.lastdestination.getName());                
-                spawnMoving(v, vhc.lastdestination);
+                if (spawnMoving(v, vhc.lastdestination)) {
+                    if (!v.lock("AMS")) {
+                        logger.error("Lock vehicle failed");
+                    }
+                }
             }
         }
         if (gsc.serviceCompleted()) {
@@ -429,20 +445,24 @@ var expiredIdle = func(gmc,vhc,gsc,maxidletime) {
     }
     return 1;
 }
-    
+
+# Returns true when spawn was successful
 var spawnMoving = func(vehicle, destinationnode) {
     var gmc = vehicle.gmc;
     
     var path = groundnet.createPathFromGraphPosition(gmc.currentposition, destinationnode, nil, true, -300000, false, vehicle.vhc.config);
-    if (path!=nil) {  
-        if (visualizer != nil) {
-            visualizer.addLayer(groundnet.groundnetgraph,path.layer);
-        }
-        vehicle.gmc.setPath(path);        
+    if (path == nil) {
+        return false;
     }
-};
+    if (visualizer != nil) {
+        visualizer.addLayer(groundnet.groundnetgraph,path.layer);
+    }
+    vehicle.gmc.setPath(path);
+    return true;
+}
 
 # startposition not used for now
+# Returns true when spawn was successful
 var spawnMovingAircraft = func(vehicle, parking, startposition) {
     var vhc = vehicle.vhc;
     logger.debug("spawnMovingAircraft: vehicle.type=" ~ vhc.config.type); 
@@ -458,9 +478,11 @@ var spawnMovingAircraft = func(vehicle, parking, startposition) {
     var graphWeightProvider = DefaultGraphWeightProvider.new(groundnet.groundnetgraph, 0, voidedges);
     
     var path = groundnet.createPathFromGraphPosition(gmc.currentposition, parking.node, graphWeightProvider, true, -300000, true, vhc.config);
-    if (path != nil) {
-        gmc.setPath(path);
+    if (path == nil) {
+        return false;
     }
+    gmc.setPath(path);
+    return true;
 }
     
 #spawn service point for aircraft. Aircraft might be an AI, the main or GS aircraft. 

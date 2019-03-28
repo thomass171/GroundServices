@@ -408,6 +408,8 @@ var setViewpoint = func(fromnode,altitudeoffset) {
     props.globals.getNode(p~"/orientation/roll-deg", 1).setValue(0);
 }
 
+#
+# Viewpoint 0 is the top view
 var cycleViewpoint = func(inc) {
     var sps = servicepointsN.getChildren("servicepoint");
     if (size(sps) == 0) {
@@ -418,12 +420,16 @@ var cycleViewpoint = func(inc) {
     }
     currentviewpoint += inc;
     if (currentviewpoint < 0) {
-        currentviewpoint = size(sps) - 1;
+        currentviewpoint = size(sps);
     }
-    if (currentviewpoint >= size(sps)) {
+    if (currentviewpoint > size(sps)) {
         currentviewpoint = 0;
     }
-    setViewpoint(sps[currentviewpoint],700);
+    if (currentviewpoint == 0) {
+        setViewpoint(props.globals.getNode("/"),1700);
+    } else {
+        setViewpoint(sps[currentviewpoint-1],700);
+    }
 }
 
 logging.debug("completed util.nas");

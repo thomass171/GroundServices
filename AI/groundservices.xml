@@ -100,7 +100,7 @@
     <vehicle>
         <name></name>
         <type>aircraft</type>
-        <modeltype></modeltype>
+        <modeltype>Bravo</modeltype>
         <model>AI/Aircraft/Citation-Bravo/Models/Bravo-ai.xml</model>
         <initialcount>1</initialcount>
         <!-- 42 kmh-->

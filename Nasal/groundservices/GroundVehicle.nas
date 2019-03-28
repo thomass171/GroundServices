@@ -83,7 +83,7 @@ var GroundVehicle = {
 		    m.latN.setDoubleValue(coord.lat());
             m.lonN.setDoubleValue(coord.lon());                		               
         }        
-                        
+        m.lockowner = nil;
         return GroundVehicle.active[m.aiid] = m;
 	},
 	del: func {
@@ -208,7 +208,11 @@ var GroundVehicle = {
 		    # might override "busy" 
 		    statemsg = "moving to node " ~ ((me.vhc.lastdestination!=nil)?me.vhc.lastdestination.getName():"");
 		}
-		var msg = sprintf("GroundVehicle [%d] %s %s %s",me.ai.getIndex(),me.vhc.type,me.aiid,statemsg);
+		var lockmsg = "unlocked";
+		if (me.lockowner != nil) {
+		    lockmsg = "locked by "~me.lockowner;
+		}
+		var msg = sprintf("GroundVehicle [%d] %s %s %s %s %s",me.ai.getIndex(),me.vhc.type,me.vhc.config.modeltype,me.aiid,statemsg,lockmsg);
 		#no longer use atc msg because of spoken atc
 		#atc_msg(msg);
 		# also report to log file, because atc messages might vanish quickly
@@ -219,6 +223,37 @@ var GroundVehicle = {
 	    me.vhc.statechangetimestamp = systime() - offset;
 	    me.gmc.statechangetimestamp = systime() - offset;
 	},
+
+	isLocked: func() {
+        return me.lockowner != nil;
+    },
+
+    lock: func(locker) {
+        logger.debug("locking id " ~ me.aiid~" by "~locker);
+        if (me.lockowner != nil) {
+            return false;
+        }
+        me.lockowner = locker;
+        return true;
+    },
+
+    release: func(releaser) {
+        if (releaser != me.lockowner) {
+            logger.warn("released not by owner");
+        }
+        me.lockowner = nil;
+    },
+
+    isLockedBy: func(s) {
+        if (s == nil) {
+            return false;
+        }
+        return s == me.lockowner;
+    },
+
+    getLockOwner: func() {
+        return me.lockowner;
+    },
 	
 	active: {},
 };
@@ -565,7 +600,7 @@ var findAvailableVehicles = func(vehicletype, modeltype) {
         var vhc = v.vhc;
         var gmc = v.gmc;
         var gsc = v.gsc;
-        if (vhc.config.type == vehicletype and gsc.isIdle() and gmc.isMoving() == nil) {
+        if (vhc.config.type == vehicletype and !v.isLocked()) {
             if (modeltype == nil or gsc.config.modeltype == modeltype) {
                 append(list,v);
             }
